@@ -67,7 +67,7 @@ ENV = DATA / "pengaturan.env"
 PORT = int(os.environ.get("STUDIO_PORT", "8787"))
 KUNCI = ["SUARA", "VOXCPM_MODE", "VOXCPM_DESAIN", "AI", "LANGGANAN", "OPENCODE_MODEL", "CLAUDE_CODE_MODEL", "CODEX_MODEL", "GEMINI_API_KEY", "GEMINI_MODEL",
          "OPENAI_BASE_URL", "OPENAI_API_KEY", "OPENAI_MODEL", "SUARA_MAC", "TEMA", "PIXABAY_API_KEY",
-         "JEDA_POSTING_MENIT"]
+         "JEDA_POSTING_MENIT", "KLIP_COOKIES_BROWSER"]
 BAWAAN = {"SUARA": "bawaan", "VOXCPM_MODE": "bawaan", "AI": "lokal", "LANGGANAN": "claude-code", "GEMINI_MODEL": "gemini-3.8-flash",
           "OPENAI_BASE_URL": "http://localhost:11434/v1", "OPENAI_MODEL": "gemma3:4b", "SUARA_MAC": "Damayanti"}
 
@@ -83,15 +83,41 @@ def baca_pengaturan() -> dict:
     return p
 
 
+def url_ai_aman(url: str) -> bool:
+    """Kunci API hanya boleh dikirim lewat https, kecuali ke server di laptop/jaringan rumah sendiri (Ollama, LM Studio)."""
+    import ipaddress
+    u = urlparse(url)
+    if u.scheme == "https" and u.hostname:
+        return True
+    host = u.hostname or ""
+    if u.scheme != "http" or not host:
+        return False
+    if host == "localhost" or host.endswith(".local"):
+        return True
+    try:
+        return ipaddress.ip_address(host).is_private or ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
 def simpan_pengaturan(baru: dict) -> None:
     p = baca_pengaturan()
     for k in KUNCI:
         if k in baru and baru[k] is not None:
-            p[k] = str(baru[k]).strip()
+            v = str(baru[k]).strip()
+            if re.search(r"[\r\n\x00]", v):  # satu baris per kunci: cegah menyisipkan kunci lain ke file .env
+                raise ValueError(f"Isian {k} tidak boleh berisi baris baru.")
+            p[k] = v
+    if baru.get("OPENAI_BASE_URL") and not url_ai_aman(p["OPENAI_BASE_URL"]):
+        raise ValueError("Alamat server AI harus https:// (http hanya untuk localhost) agar kunci API tidak terkirim tanpa enkripsi.")
     DATA.mkdir(parents=True, exist_ok=True)
-    ENV.write_text("# Pengaturan Studio Maliki (berisi kunci AI — jangan dibagikan)\n" +
-                   "\n".join(f"{k}={p.get(k, '')}" for k in KUNCI) + "\n", encoding="utf-8")
-    os.chmod(ENV, 0o600)
+    tmp = ENV.with_suffix(".tmp")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write("# Pengaturan Studio Maliki (berisi kunci AI — jangan dibagikan)\n" +
+                 "\n".join(f"{k}={p.get(k, '')}" for k in KUNCI) + "\n")
+    os.replace(tmp, ENV)
+    UNGGAH.kunci_pemilik(ENV)
 
 
 def samarkan(p: dict) -> dict:
@@ -353,8 +379,10 @@ def mulai_klip(d: dict) -> dict:
     sumber = (d.get("sumber") or "").strip()
     if not sumber:
         raise ValueError("Isi link YouTube atau pilih file video dulu.")
+    if sumber.startswith("-"):  # cegah dibaca sebagai opsi baris perintah
+        raise ValueError("Sumber tidak valid. Tempel link https:// atau pilih file video.")
     folder = proyek_baru("klip")
-    cmd = [*jalankan_skrip(KLIP / "klip.py"), sumber, "--keluar", str(folder),
+    cmd = [*jalankan_skrip(KLIP / "klip.py"), "--keluar", str(folder),
            "--jumlah", str(int(d.get("jumlah", 3))), "--durasi", str(int(d.get("durasi", 30))),
            "--ai", penyedia_ai(d.get("ai")), "--model", d.get("model", "small"),
            "--warna", d.get("warna", "#FFB020")]
@@ -365,6 +393,7 @@ def mulai_klip(d: dict) -> dict:
         cmd += ["--rentang", d["rentang"]]
     if d.get("subtitle_file"):
         cmd += ["--subtitle-file", d["subtitle_file"]]
+    cmd += ["--", sumber]  # argumen posisi terakhir, setelah "--"
     (folder / "permintaan.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
 
     t = ANTREAN.tambah("utama", "klip", [(cmd, KLIP)], folder, ("muat_proyek", {"jenis": "klip", "nama": folder.name}),
@@ -561,6 +590,7 @@ def cek_sistem() -> dict:
 # ── Unggah ke media sosial (API resmi, selalu lewat layar review) ───────────
 OAUTH_SESI: dict = {}
 RIWAYAT_UNGGAH = DATA / "unggah" / "riwayat.jsonl"
+BATAS_UNGGAH = 20 * 2**30  # 20 GB per file yang diseret ke Studio
 
 
 MODUL_PLATFORM = {"youtube": UNGGAH, "tiktok": TT, "instagram": IG}
@@ -918,15 +948,26 @@ class H(BaseHTTPRequestHandler):
                 (DATA / f"suara-referensi.{eks}").write_bytes(self.rfile.read(n))
                 return self._json({"ok": True})
             if jalur == "/api/unggah":
-                nama = re.sub(r"[^\w.-]", "_", self.headers.get("X-Nama-File", "video.mp4"))
+                nama = re.sub(r"[^\w.-]", "_", Path(self.headers.get("X-Nama-File", "video.mp4")).name).lstrip(".")[:120] or "video.mp4"
                 tujuan = DATA / ("aset" if self.headers.get("X-Jenis") == "aset" else "unggahan")
                 tujuan.mkdir(parents=True, exist_ok=True)
-                p = tujuan / nama
                 n = int(self.headers.get("Content-Length") or 0)
+                if n <= 0 or n > BATAS_UNGGAH:
+                    return self._json({"galat": f"Ukuran file harus di bawah {BATAS_UNGGAH // 2**30} GB."}, 413)
+                if shutil.disk_usage(tujuan).free - n < 2 * 2**30:
+                    return self._json({"galat": "Ruang disk tidak cukup (sisakan minimal 2 GB)."}, 507)
+                p = tujuan / nama
+                i = 1
+                while p.exists():  # jangan menimpa file lain yang namanya sama
+                    p = tujuan / f"{Path(nama).stem}-{i}{Path(nama).suffix}"
+                    i += 1
                 with open(p, "wb") as fh:
                     while n > 0 and (blok := self.rfile.read(min(1 << 20, n))):
                         fh.write(blok)
                         n -= len(blok)
+                if n > 0:  # koneksi putus di tengah → buang file setengah jadi
+                    p.unlink(missing_ok=True)
+                    return self._json({"galat": "Unggahan terputus."}, 400)
                 return self._json({"jalur": str(p)})
             d = self._body()
             if jalur == "/api/pengaturan":

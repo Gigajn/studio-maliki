@@ -27,6 +27,7 @@ import hashlib
 import json
 import os
 import secrets
+import subprocess
 import sys
 import time
 import urllib.error
@@ -56,6 +57,18 @@ def folder_rahasia(data: Path) -> Path:
     return f
 
 
+def kunci_pemilik(p: Path) -> None:
+    """Hanya pemilik akun yang boleh membaca file rahasia. Di macOS/Linux lewat mode 600; di Windows chmod tidak
+    berlaku, jadi warisan izin folder diputus dan akses diberikan hanya ke pengguna saat ini (icacls)."""
+    try:
+        os.chmod(p, 0o600)
+        if os.name == "nt" and os.environ.get("USERNAME"):
+            subprocess.run(["icacls", str(p), "/inheritance:r", "/grant:r", f"{os.environ['USERNAME']}:F"],
+                           capture_output=True, timeout=20, creationflags=0x08000000)
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+
 def _tulis_rahasia(p: Path, isi: dict) -> None:
     sementara = p.with_suffix(".tmp")
     # buat file dengan izin 600 sejak awal (tidak sempat terbaca akun lain)
@@ -63,6 +76,7 @@ def _tulis_rahasia(p: Path, isi: dict) -> None:
     with os.fdopen(fd, "w", encoding="utf-8") as fh:
         json.dump(isi, fh)
     os.replace(sementara, p)
+    kunci_pemilik(p)
 
 
 def _baca(p: Path) -> dict:

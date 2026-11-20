@@ -17,20 +17,17 @@ from .umum import AKAR
 # ── 1. Sumber video ─────────────────────────────────────────────────────────
 DIBLOKIR = ("not a bot", "sign in to confirm", "confirm your age", "login_required", "429")
 PESAN_BLOKIR = ("YouTube meminta verifikasi (\"bukan bot\") dan menolak unduhan dari koneksi ini. Coba: matikan VPN/proxy, "
-                "buka youtube.com di Firefox/Chrome dan pastikan sudah login lalu ulangi, ganti jaringan (Wi-Fi/hotspot), "
-                "atau unduh videonya sendiri dan seret file-nya ke Studio.")
+                "ganti jaringan (Wi-Fi/hotspot), atau unduh videonya sendiri dan seret file-nya ke Studio. "
+                "Bila perlu, izinkan Studio meminjam login YouTube dari browsermu di Pengaturan AI → Unduhan YouTube.")
 
 
 def _browser_cookies() -> list[str]:
-    """Browser yang cookies YouTube-nya bisa dipinjam yt-dlp. Firefox dulu: Chrome/Edge di Windows mengenkripsi
-    cookies (app-bound) sehingga sering tidak terbaca."""
+    """Browser yang cookies YouTube-nya BOLEH dipinjam yt-dlp. Hanya bila pengguna mengaktifkannya sendiri di
+    Pengaturan (KLIP_COOKIES_BROWSER), karena menyangkut privasi dan akun bisa ditandai bot oleh YouTube."""
     import os
-    pilih = os.environ.get("KLIP_COOKIES_BROWSER")
-    if pilih:
-        return [b.strip() for b in pilih.split(",") if b.strip()]
-    if sys.platform == "darwin":
-        return ["firefox", "chrome", "safari", "brave", "edge"]
-    return ["firefox", "chrome", "edge", "brave"]
+    pilih = os.environ.get("KLIP_COOKIES_BROWSER", "")
+    boleh = {"firefox", "chrome", "chromium", "edge", "brave", "safari", "opera", "vivaldi"}
+    return [b.strip().lower() for b in pilih.split(",") if b.strip().lower() in boleh]
 
 
 def _unduh(yt_dlp, url: str, opsi: dict) -> dict:

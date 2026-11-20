@@ -880,6 +880,12 @@ main{position:relative;z-index:1}
         <div class="bidang" style="margin:16px 0 0"><label>Jeda minimum antar-posting per platform <em>menit · mencegah dianggap spam</em></label>
           <div style="display:flex;gap:10px"><input class="input" id="jedaPosting" type="number" min="0" max="1440" style="max-width:140px"><button class="tombol kedua kecil" id="tblSimpanJeda">Simpan</button></div></div>
       </div>
+      <div class="kartu" style="margin-top:16px"><h2 class="judul-kartu"><i style="background:var(--oranye)"></i>Unduhan YouTube</h2>
+        <p style="color:var(--redup);font-size:13px;margin:0 0 10px">Bila YouTube meminta verifikasi "bukan bot", Studio bisa meminjam login YouTube dari browsermu.
+          Bawaannya <b>mati</b>: cookies browser menyangkut privasi, dan akun bisa ditandai bot. Cookies hanya dibaca di laptop ini, tidak dikirim ke mana pun.</p>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><select class="input" id="pilCookies" style="max-width:260px">
+          <option value="">Mati (disarankan)</option><option value="firefox">Firefox</option><option value="chrome">Chrome</option><option value="edge">Edge</option>
+          <option value="brave">Brave</option><option value="safari">Safari</option></select></div></div>
       <div class="kartu" style="margin-top:16px"><h2 class="judul-kartu"><i style="background:var(--hijau)"></i>Cek sistem</h2>
         <div class="aksi" style="margin:0 0 12px"><button class="tombol kedua kecil" id="bukaWizard">Buka wizard pemasangan</button></div><div id="cekSistem" class="ringkas" style="margin:0"></div></div>
     </section>
@@ -1428,7 +1434,7 @@ async function muatAkun() {
     const u = $(`[data-putus="${p}"]`); if (u) u.hidden = !a.terhubung;
   }
   $('#ttRedirect').textContent = `http://127.0.0.1:${location.port}/oauth/tiktok`;
-  if (typeof PENG === 'object' && PENG) $('#jedaPosting').value = PENG.JEDA_POSTING_MENIT || 30;
+  if (typeof PENG === 'object' && PENG) { $('#jedaPosting').value = PENG.JEDA_POSTING_MENIT || 30; $('#pilCookies').value = PENG.KLIP_COOKIES_BROWSER || ''; }
   return AKUN;
 }
 $('#tblSimpanKlienYT').onclick = async () => {
@@ -1442,6 +1448,11 @@ $('#tblSimpanKlienTT').onclick = async () => {
 $('#tblSimpanIG').onclick = async () => {
   try { await api('/api/instagram-token', {token: $('#igToken').value}); $('#igToken').value = ''; toast('Instagram tersambung ✓'); muatAkun(); }
   catch (e) { toast(e.message, true); }
+};
+$('#pilCookies').onchange = async (e) => {
+  const v = e.target.value;
+  if (v && !confirm(`Izinkan Studio membaca cookies YouTube dari ${e.target.selectedOptions[0].text} saat YouTube memblokir unduhan?`)) { e.target.value = ''; return; }
+  try { const r = await api('/api/pengaturan', {KLIP_COOKIES_BROWSER: v}); PENG = r.pengaturan; toast(v ? 'Diizinkan ✓' : 'Dimatikan ✓'); } catch (er) { toast(er.message, true); }
 };
 $('#tblSimpanJeda').onclick = async () => {
   try { const r = await api('/api/pengaturan', {JEDA_POSTING_MENIT: String(Math.max(0, +$('#jedaPosting').value || 0))}); PENG = r.pengaturan; toast('Jeda tersimpan ✓'); }

@@ -62,5 +62,26 @@ k, t = req("/api/unggah-klip", {"platform": "tiktok", "nama": "x", "no": 1, "izi
 k, t = req("/api/unggah-klip", {"platform": "facebook", "nama": "x", "no": 1, "izin": True}); cek("platform asing ditolak", k == 400, t)
 k, t = req("/api/akun-unggah"); cek("status tiga akun", set(json.loads(t)) == {"youtube", "tiktok", "instagram"}, t)
 k, t = req("/oauth/tiktok?state=palsu&code=x", headers={"Sec-Fetch-Site": "cross-site"}); cek("state TikTok palsu ditolak", "tidak berlaku" in t, t[:200])
+# ── perbaikan keamanan K7–K9 ──
+k, t = req("/api/pengaturan", {"GEMINI_MODEL": "x\nOPENAI_BASE_URL=http://jahat.com"}); cek("baris baru di pengaturan ditolak", k == 400, t)
+k, t = req("/api/pengaturan", {"OPENAI_BASE_URL": "http://jahat.com/v1"}); cek("URL AI http publik ditolak", k == 400 and "https" in t, t)
+for url in ("https://api.groq.com/openai/v1", "http://localhost:11434/v1", "http://192.168.1.5:11434/v1"):
+    k, t = req("/api/pengaturan", {"OPENAI_BASE_URL": url}); cek(f"URL AI diterima: {url}", k == 200, t)
+cek("file pengaturan 600", oct((data / "pengaturan.env").stat().st_mode)[-3:] == "600" if (data / "pengaturan.env").exists() else True)
+k, t = req("/api/klip", {"sumber": "--keluar=/etc"}); cek("sumber berawalan - ditolak", k == 400, t)
+def unggah(nama, isi):
+    r = urllib.request.Request(B + "/api/unggah", data=isi, headers={"X-Nama-File": nama, "Content-Type": "application/octet-stream"}, method="POST")
+    with urllib.request.urlopen(r, timeout=10) as x:
+        return json.loads(x.read())["jalur"]
+j1, j2 = unggah("../../a.mp4", b"1"), unggah("a.mp4", b"2")
+cek("unggah: nama unik, tidak menimpa", j1 != j2 and Path(j1).read_bytes() == b"1" and Path(j2).read_bytes() == b"2", (j1, j2))
+cek("unggah: tetap di folder unggahan", Path(j1).parent == data / "unggahan", j1)
+r = urllib.request.Request(B + "/api/unggah", data=b"", headers={"X-Nama-File": "x.mp4", "Content-Length": str(30 * 2**30)}, method="POST")
+try:
+    urllib.request.urlopen(r, timeout=10); cek("unggah > 20 GB ditolak", False)
+except urllib.error.HTTPError as e:
+    cek("unggah > 20 GB ditolak", e.code == 413, e.code)
+except Exception as e:  # server menutup koneksi lebih awal juga dianggap menolak
+    cek("unggah > 20 GB ditolak", True)
 srv.terminate()
 print(f"{sum(hasil)}/{len(hasil)} lulus"); sys.exit(0 if all(hasil) else 1)
