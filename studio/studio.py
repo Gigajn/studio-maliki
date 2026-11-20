@@ -668,8 +668,9 @@ def mulai_unggah(d: dict) -> dict:
         else:
             meta["ke_feed"] = d.get("ke_feed", True) is not False
         judul_label = (teks.splitlines() or [""])[0]
-    if d.get("cover_ms") not in (None, ""):
-        meta["cover_ms"] = max(int(float(d["cover_ms"])), 0)
+    if d.get("cover_ms") not in (None, "") and platform != "youtube":  # Shorts tidak menerima sampul lewat API
+        durasi_ms = int((float(klip.get("selesai", 0)) - float(klip.get("mulai", 0))) * 1000)
+        meta["cover_ms"] = min(max(int(float(d["cover_ms"])), 0), max(durasi_ms - 100, 0))
     meta["sumber_izin"] = str(d.get("sumber_izin", "") or (kamp or {}).get("sumber_izin", ""))[:300]
     meta["kampanye"] = kamp["id"] if kamp else ""
     jadwal = _jadwal(d.get("jadwal"))

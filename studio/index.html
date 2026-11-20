@@ -467,6 +467,7 @@ main{position:relative;z-index:1}
 }
 @media (max-width:900px){.grid2,.penyedia,.langkah{grid-template-columns:1fr}.kartu-klip,.video-besar{grid-template-columns:1fr}main{padding:18px 16px}}
 .grid-kandidat{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.ug-sampul{display:flex;flex-direction:column;gap:8px;margin-top:12px;width:200px}.ug-sampul label{display:flex;justify-content:space-between;font-size:13px}.ug-sampul em{font-style:normal;color:var(--redup);font-family:var(--mono);font-size:12px}.ug-sampul canvas{width:90px;height:160px;border-radius:8px;background:#000}.ug-sampul small{color:var(--redup);font-size:11.5px;line-height:1.4}.ug-sampul .pil button{padding:4px 8px;font-size:12px}
 </style>
 </head>
 <body>
@@ -888,7 +889,13 @@ main{position:relative;z-index:1}
 <div class="tirai" id="dlgUnggah" hidden role="dialog" aria-labelledby="ugJudulDlg"><div class="wiz" style="width:min(920px,94vw)">
   <div class="wiz-kepala"><div><h2 id="ugJudulDlg">Review sebelum unggah</h2><small id="ugKet"></small></div></div>
   <div class="wiz-isi ug-isi">
-    <div><video id="ugVideo" controls playsinline style="width:200px;aspect-ratio:9/16;border-radius:12px;background:#000"></video><div id="ugSampul"></div></div>
+    <div><video id="ugVideo" controls playsinline style="width:200px;aspect-ratio:9/16;border-radius:12px;background:#000"></video><div id="ugSampul" class="ug-sampul">
+      <label>Sampul <em id="sbWaktu">0,0 dtk</em></label>
+      <canvas id="sbKanvas" width="180" height="320" aria-label="pratinjau sampul"></canvas>
+      <input type="range" id="sbGeser" min="0" max="60" step="0.1" value="0" aria-label="pilih frame sampul">
+      <div class="pil" id="sbUsul" style="flex-wrap:wrap"></div>
+      <small>Dipakai untuk TikTok (posting langsung) dan Instagram Reels. YouTube Shorts memilih sampul sendiri; ganti dari aplikasi YouTube.</small>
+    </div></div>
     <div>
       <div class="bidang"><label>Kampanye <em>caption mengikuti aturannya</em></label><select class="input" id="ugKampanye"><option value="">Tanpa kampanye</option></select></div>
       <div class="bidang"><label>Unggah ke <em>pilih satu atau lebih</em></label><div class="pil" id="ugPlatform"></div></div>
@@ -1515,9 +1522,36 @@ async function bukaUnggah(k) {
   $$('#ttMode button').forEach((b) => b.classList.toggle('aktif', b.dataset.v === 'draf')); $('#ttBagPrivasi').hidden = $('#ttBagInteraksi').hidden = true;
   $('#ttKreator').textContent = 'Mode draf: video masuk kotak masuk TikTok, kamu menyelesaikan posting di aplikasi.';
   await muatKampanye(); await isiSemuaCaption(); tampilTabUG(); catatanMerekTT();
+  siapkanSampul(k);
   $('#dlgUnggah').hidden = false;
 }
 $('#ugKampanye').onchange = isiSemuaCaption;
+// ── Pilih sampul (cover): frame dari klip yang sudah dirender ──
+function gambarSampul() {
+  const v = $('#ugVideo'), c = $('#sbKanvas'), x = c.getContext('2d');
+  if (!v.videoWidth) return;
+  const r = Math.max(c.width / v.videoWidth, c.height / v.videoHeight), w = v.videoWidth * r, h = v.videoHeight * r;
+  x.fillStyle = '#000'; x.fillRect(0, 0, c.width, c.height); x.drawImage(v, (c.width - w) / 2, (c.height - h) / 2, w, h);
+}
+function setSampul(t) {
+  if (!UG) return;
+  const v = $('#ugVideo'); UG.sampul = Math.max(0, Math.min(t, (v.duration || UG.durasi) - 0.05));
+  $('#sbGeser').value = UG.sampul; $('#sbWaktu').textContent = UG.sampul.toLocaleString('id-ID', {maximumFractionDigits: 1}) + ' dtk';
+  v.pause(); v.currentTime = UG.sampul;
+  $$('#sbUsul button').forEach((b) => b.classList.toggle('aktif', Math.abs(+b.dataset.t - UG.sampul) < 0.05));
+}
+function siapkanSampul(k) {
+  const durasi = Math.max(1, (k.selesai || 0) - (k.mulai || 0)); UG.durasi = durasi;
+  const hook = k.hook != null && k.hook >= k.mulai && k.hook < k.selesai ? k.hook - k.mulai : null;
+  const usul = [[hook ?? 1, hook != null ? 'Hook' : 'Awal'], [durasi * 0.25, '¼'], [durasi * 0.5, 'Tengah'], [durasi * 0.75, '¾']];
+  $('#sbGeser').max = durasi.toFixed(1);
+  $('#sbUsul').innerHTML = usul.map(([t, l]) => `<button data-t="${t.toFixed(2)}">${l}</button>`).join('');
+  $$('#sbUsul button').forEach((b) => b.onclick = () => setSampul(+b.dataset.t));
+  const v = $('#ugVideo');
+  v.onloadeddata = () => { $('#sbGeser').max = (v.duration || durasi).toFixed(1); setSampul(usul[0][0]); };
+  v.onseeked = gambarSampul;
+}
+$('#sbGeser').oninput = (e) => setSampul(+e.target.value);
 const tutupUnggah = () => { $('#dlgUnggah').hidden = true; $('#ugVideo').pause(); UG = null; };
 $('#ugBatal').onclick = tutupUnggah;
 $('#ugKirim').onclick = async () => {
@@ -1527,7 +1561,8 @@ $('#ugKirim').onclick = async () => {
   if (UG.platform.has('tiktok') && UG.ttMode === 'langsung' && !$('#ttPrivasi').value) { UG.tab = 'tiktok'; tampilTabUG(); return toast('Pilih siapa yang bisa menonton video TikTok-nya.', true); }
   const publik = (UG.platform.has('youtube') && UG.ytPrivasi === 'public') || (UG.platform.has('tiktok') && UG.ttMode === 'langsung' && $('#ttPrivasi').value === 'PUBLIC_TO_EVERYONE') || UG.platform.has('instagram');
   if (publik && !confirm('Video akan tayang PUBLIK di platform yang dipilih. Lanjutkan?')) return;
-  const umum = {nama: KLIP.h.nama, no: UG.no, kampanye: $('#ugKampanye').value, sumber_izin: $('#ugSumberIzin').value, jadwal, izin: true};
+  const umum = {nama: KLIP.h.nama, no: UG.no, kampanye: $('#ugKampanye').value, sumber_izin: $('#ugSumberIzin').value, jadwal, izin: true,
+    cover_ms: UG.sampul != null ? Math.round(UG.sampul * 1000) : ''};
   const isi = {
     youtube: {judul: $('#ytJudul').value, deskripsi: $('#ytDesk').value, tag: $('#ytTag').value.split(',').map((t) => t.trim()).filter(Boolean), privasi: UG.ytPrivasi, untuk_anak: $('#ytAnak').checked},
     tiktok: {teks: $('#ttTeks').value, mode: UG.ttMode, privasi: $('#ttPrivasi').value, tanpa_komentar: !$('#ttKomentar').checked, tanpa_duet: !$('#ttDuet').checked,
