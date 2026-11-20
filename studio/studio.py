@@ -11,6 +11,7 @@ Jalankan: uv run studio.py            → jendela aplikasi (native)
 """
 from __future__ import annotations
 
+import html
 import json
 import mimetypes
 import os
@@ -23,9 +24,12 @@ import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 AKAR = Path(__file__).resolve().parent
+sys.path.insert(0, str(AKAR))
+import unggah as UNGGAH  # noqa: E402  (pustaka standar saja)
+
 ALAT = AKAR.parent
 KLIP = ALAT / "klip"
 if not os.environ.get("STUDIO_PY") and (ALAT / "BUNDEL").exists():
@@ -206,7 +210,8 @@ CLI_DIR = Path.home() / ".studio-maliki" / "cli"  # CLI dipasang di sini (tanpa 
 PAKET_CLI = {"codex": "@openai/codex", "opencode": "opencode-ai", "claude": "@anthropic-ai/claude-code"}
 PERINTAH_LOGIN = {"claude": "claude auth login", "codex": "codex login", "opencode": "opencode auth login"}
 DOMAIN_BOLEH = ("aistudio.google.com", "ollama.com", "nodejs.org", "platform.openai.com",
-                "openrouter.ai", "console.groq.com", "chatgpt.com", "claude.ai", "opencode.ai", "docs.astral.sh")
+                "openrouter.ai", "console.groq.com", "chatgpt.com", "claude.ai", "opencode.ai", "docs.astral.sh",
+                "youtube.com", "www.youtube.com", "studio.youtube.com", "console.cloud.google.com")
 
 
 def cari_cli(nama: str) -> str | None:
@@ -602,6 +607,81 @@ def cek_sistem() -> dict:
             "voxcpm": voxcpm_terpasang(), "referensi": ref_suara().name if ref_suara() else ""}
 
 
+# ── Unggah ke media sosial (API resmi, selalu lewat layar review) ───────────
+OAUTH_SESI: dict = {}
+RIWAYAT_UNGGAH = DATA / "unggah" / "riwayat.jsonl"
+
+
+def youtube_masuk() -> dict:
+    url, sesi = UNGGAH.mulai_izin(DATA, f"http://127.0.0.1:{PORT}/oauth/youtube")
+    OAUTH_SESI.clear()
+    OAUTH_SESI[sesi["state"]] = sesi
+    webbrowser.open(url)  # halaman izin resmi Google di browser bawaan
+    return {"ok": True, "url": url}
+
+
+def oauth_youtube_kembali(q: dict) -> str:
+    def halaman(judul: str, isi: str) -> str:
+        return (f"<!doctype html><meta charset=utf-8><title>Studio Maliki</title><body style='font-family:system-ui;"
+                f"background:#07090F;color:#e2e8f0;display:grid;place-items:center;height:100vh;margin:0'>"
+                f"<div style='max-width:420px;text-align:center'><h2>{html.escape(judul)}</h2><p>{html.escape(isi)}</p></div>")
+    state = (q.get("state") or [""])[0]
+    sesi = OAUTH_SESI.pop(state, None)
+    if not sesi or time.time() - sesi["waktu"] > 600:
+        return halaman("Tautan izin tidak berlaku", "Ulangi dari Studio: Pengaturan → Akun unggah → Sambungkan YouTube.")
+    if q.get("error"):
+        return halaman("Izin dibatalkan", f"Google: {(q.get('error') or [''])[0]}")
+    try:
+        UNGGAH.tukar_kode(DATA, sesi, (q.get("code") or [""])[0])
+    except Exception as e:  # noqa: BLE001
+        return halaman("Gagal menyambungkan YouTube", str(e))
+    return halaman("YouTube tersambung ✓", "Tutup tab ini lalu kembali ke Studio Maliki.")
+
+
+def mulai_unggah(d: dict) -> dict:
+    """Unggah satu klip yang SUDAH direview pengguna. Tanpa centang izin, permintaan ditolak."""
+    if d.get("platform", "youtube") != "youtube":
+        raise ValueError("Saat ini baru YouTube yang didukung.")
+    if d.get("izin") is not True:
+        raise ValueError("Centang pernyataan bahwa kamu berhak mengunggah konten ini.")
+    if not UNGGAH.status(DATA)["terhubung"]:
+        raise ValueError("Sambungkan akun YouTube dulu di Pengaturan → Akun unggah.")
+    nama = re.sub(r"[^\w-]", "", str(d.get("nama", "")))
+    folder = DATA / "klip" / nama
+    no = int(d.get("no", 0))
+    daftar = json.loads((folder / "klip.json").read_text(encoding="utf-8")) if (folder / "klip.json").exists() else []
+    klip = next((x for x in daftar if x.get("no") == no), None)
+    if not klip or not klip.get("file") or not (folder / Path(klip["file"]).name).is_file():
+        raise ValueError("Klip belum dirender. Render dulu, lalu unggah.")
+    meta = UNGGAH.rapikan_meta(d)
+    meta["sumber_izin"] = str(d.get("sumber_izin", ""))[:300]
+    berkas = folder / Path(klip["file"]).name
+    f_meta = folder / f"unggah-{no:02d}.json"
+    f_hasil = folder / f"unggah-{no:02d}-hasil.json"
+    f_hasil.unlink(missing_ok=True)
+    f_meta.write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
+    cmd = [*jalankan_skrip(AKAR / "unggah.py"), "--data", str(DATA), "--berkas", str(berkas),
+           "--meta", str(f_meta), "--hasil", str(f_hasil)]
+
+    def setelah(k: Kerja):
+        if not f_hasil.exists():
+            return
+        hasil = json.loads(f_hasil.read_text(encoding="utf-8"))
+        hasil.update(proyek=nama, no=no, sumber_izin=meta["sumber_izin"])
+        semua = json.loads((folder / "klip.json").read_text(encoding="utf-8"))
+        for x in semua:
+            if x.get("no") == no:
+                x.setdefault("unggahan", []).append(hasil)
+        (folder / "klip.json").write_text(json.dumps(semua, ensure_ascii=False, indent=2), encoding="utf-8")
+        RIWAYAT_UNGGAH.parent.mkdir(parents=True, exist_ok=True)
+        with open(RIWAYAT_UNGGAH, "a", encoding="utf-8") as fh:  # log jejak: apa, ke mana, kapan, atas izin apa
+            fh.write(json.dumps(hasil, ensure_ascii=False) + "\n")
+        k.hasil = muat_proyek("klip", nama)
+
+    KERJA.jalankan("unggah", [(cmd, AKAR)], folder, setelah)
+    return {"proyek": nama}
+
+
 # ── HTTP ────────────────────────────────────────────────────────────────────
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a):
@@ -649,9 +729,31 @@ class H(BaseHTTPRequestHandler):
         asal = self.headers.get("Origin")
         return asal is None or asal in (f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}")
 
+    def _host_aman(self) -> bool:
+        # cegah DNS rebinding: situs lain yang namanya diarahkan ke 127.0.0.1 membawa Host miliknya sendiri
+        return self.headers.get("Host", "") in (f"127.0.0.1:{PORT}", f"localhost:{PORT}")
+
+    def _bukan_lintas_situs(self) -> bool:
+        # cegah situs lain memicu endpoint GET (mis. lewat <img>); peramban lama tanpa Sec-Fetch-Site tetap boleh
+        return self.headers.get("Sec-Fetch-Site", "same-origin") in ("same-origin", "none")
+
+    def _html(self, isi: str, kode=200):
+        b = isi.encode()
+        self.send_response(kode)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(b)))
+        self.end_headers()
+        self.wfile.write(b)
+
     def do_GET(self):
         u = urlparse(self.path)
         jalur = unquote(u.path)
+        if not self._host_aman():
+            return self._json({"galat": "host tidak diizinkan"}, 403)
+        if jalur == "/oauth/youtube":  # kembali dari halaman izin Google (lintas situs, dijaga oleh state + PKCE)
+            return self._html(oauth_youtube_kembali(parse_qs(u.query)))
+        if jalur.startswith(("/api/", "/berkas/")) and not self._bukan_lintas_situs():
+            return self._json({"galat": "asal tidak diizinkan"}, 403)
         try:
             if jalur in ("/", "/index.html"):
                 return self._file(AKAR / "index.html")
@@ -676,6 +778,8 @@ class H(BaseHTTPRequestHandler):
                 return self._json(status_ai())
             if jalur == "/api/proyek":
                 return self._json(daftar_proyek())
+            if jalur == "/api/akun-unggah":
+                return self._json({"youtube": UNGGAH.status(DATA)})
             if m := re.match(r"^/api/jejak/([\w-]+)/(\d+)$", jalur):
                 return self._json(jejak_klip(m.group(1), int(m.group(2))))
             if m := re.match(r"^/api/proyek/(klip|motion)/([\w-]+)$", jalur):
@@ -693,7 +797,7 @@ class H(BaseHTTPRequestHandler):
             pass
 
     def do_POST(self):
-        if not self._asal_aman():
+        if not self._host_aman() or not self._asal_aman():
             return self._json({"galat": "asal tidak diizinkan"}, 403)
         jalur = urlparse(self.path).path
         try:
@@ -758,6 +862,19 @@ class H(BaseHTTPRequestHandler):
                 return self._json(simpan_subtitle(d))
             if jalur == "/api/klip-render":
                 return self._json(mulai_render_klip(d))
+            if jalur == "/api/youtube-klien":
+                cid, rahasia = d.get("client_id", ""), d.get("client_secret", "")
+                if d.get("json"):
+                    cid, rahasia = UNGGAH.klien_dari_json(d["json"])
+                UNGGAH.simpan_klien(DATA, cid, rahasia)
+                return self._json({"youtube": UNGGAH.status(DATA)})
+            if jalur == "/api/youtube-masuk":
+                return self._json(youtube_masuk())
+            if jalur == "/api/youtube-putus":
+                UNGGAH.hapus_token(DATA)
+                return self._json({"youtube": UNGGAH.status(DATA)})
+            if jalur == "/api/unggah-klip":
+                return self._json(mulai_unggah(d))
             if jalur == "/api/hapus-proyek":
                 f = (DATA / d.get("jenis", "") / re.sub(r"[^\w-]", "", d.get("nama", ""))).resolve()
                 if f.is_dir() and DATA.resolve() in f.parents and f.parent.name in ("klip", "motion"):
@@ -771,7 +888,8 @@ class H(BaseHTTPRequestHandler):
                 f = (DATA / d.get("jenis", "") / d.get("nama", "") / d.get("file", "")).resolve()
                 if not f.is_file() or DATA.resolve() not in f.parents:
                     return self._json({"galat": "berkas tidak ditemukan"}, 404)
-                tujuan = Path.home() / "Downloads" / f"{d.get('nama')}-{f.name}"
+                awal = re.sub(r"[^\w-]", "", str(d.get("nama", "")))[:60] or "studio"
+                tujuan = Path.home() / "Downloads" / f"{awal}-{f.name}"
                 shutil.copy(f, tujuan)
                 return self._json({"jalur": str(tujuan)})
             if jalur == "/api/matikan":
@@ -789,6 +907,10 @@ class H(BaseHTTPRequestHandler):
             self._json({"galat": "tidak ditemukan"}, 404)
         except (ValueError, RuntimeError, json.JSONDecodeError) as e:
             self._json({"galat": str(e)}, 400)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        except Exception as e:  # noqa: BLE001 — selalu jawab, jangan biarkan halaman menggantung
+            self._json({"galat": f"Galat tak terduga: {type(e).__name__}: {e}"}, 500)
 
 
 def buka_folder(f: Path) -> None:
@@ -869,6 +991,10 @@ def main():
 
     class Jembatan:
         def unduh(self, nama: str, isi: str) -> str:
+            # hanya nama file (tanpa folder) → tidak bisa menulis di luar Downloads
+            nama = re.sub(r"[^\w. ()-]", "_", Path(str(nama)).name).lstrip(".")[:120] or "unduhan.txt"
+            if Path(nama).suffix.lower() not in (".json", ".srt", ".txt", ".md", ".csv", ".vtt"):
+                nama += ".txt"
             tujuan = Path.home() / "Downloads" / nama
             tujuan.write_text(isi, encoding="utf-8")
             return str(tujuan)

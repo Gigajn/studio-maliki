@@ -755,12 +755,43 @@ main{position:relative;z-index:1}
         </div>
         <div class="aksi"><button class="tombol utama" id="tblSimpanSuara">Simpan suara</button></div>
       </div>
+      <div class="kartu" style="margin-top:16px" id="kartuAkun"><h2 class="judul-kartu"><i style="background:var(--merah)"></i>Akun unggah · YouTube</h2>
+        <div class="ringkas" id="statusYT" style="margin:0 0 12px"></div>
+        <div id="bagKlienYT">
+          <div class="catatan" style="margin:0 0 12px">Unggah memakai <b>YouTube Data API resmi</b> dengan proyek Google Cloud milikmu sendiri (gratis, kuota ±6 video/hari).
+            1) Buka <a href="#" data-tautan-luar="https://console.cloud.google.com/apis/library/youtube.googleapis.com">Google Cloud Console</a>, aktifkan <b>YouTube Data API v3</b>.
+            2) Atur <i>OAuth consent screen</i> dan tambahkan emailmu sebagai test user.
+            3) Buat <a href="#" data-tautan-luar="https://console.cloud.google.com/apis/credentials">OAuth client ID</a> jenis <b>Desktop app</b>, lalu tempel di bawah.
+            Selama proyek belum lolos audit Google, video hanya bisa diunggah sebagai <b>privat</b>; ubah ke publik dari YouTube Studio.</div>
+          <div class="bidang"><label>Client ID</label><input class="input" id="ytClientId" placeholder="xxxx.apps.googleusercontent.com" autocomplete="off"></div>
+          <div class="bidang"><label>Client secret</label><input class="input" id="ytClientSecret" type="password" autocomplete="off"></div>
+          <div class="aksi" style="margin:0 0 12px"><button class="tombol kedua kecil" id="tblSimpanKlienYT">Simpan client</button></div>
+        </div>
+        <div class="aksi" style="margin:0"><button class="tombol utama kecil" id="tblMasukYT">Sambungkan YouTube</button>
+          <button class="tombol kedua kecil" id="tblPutusYT" hidden>Putuskan</button></div>
+      </div>
       <div class="kartu" style="margin-top:16px"><h2 class="judul-kartu"><i style="background:var(--hijau)"></i>Cek sistem</h2>
         <div class="aksi" style="margin:0 0 12px"><button class="tombol kedua kecil" id="bukaWizard">Buka wizard pemasangan</button></div><div id="cekSistem" class="ringkas" style="margin:0"></div></div>
     </section>
   </main>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="tirai" id="dlgUnggah" hidden role="dialog" aria-labelledby="ugJudulDlg"><div class="wiz" style="width:min(820px,94vw)">
+  <div class="wiz-kepala"><div><h2 id="ugJudulDlg">Review sebelum unggah ke YouTube</h2><small id="ugKet"></small></div></div>
+  <div class="wiz-isi" style="display:grid;grid-template-columns:200px 1fr;gap:18px;overflow:auto">
+    <video id="ugVideo" controls playsinline style="width:200px;aspect-ratio:9/16;border-radius:12px;background:#000"></video>
+    <div>
+      <div class="bidang"><label>Judul <em id="ugHitung">0/100</em></label><input class="input" id="ugJudul" maxlength="100"></div>
+      <div class="bidang"><label>Deskripsi <em>sertakan kredit sumber, mis. "Sumber: @namastreamer"</em></label><textarea class="input" id="ugDesk" rows="5"></textarea></div>
+      <div class="bidang"><label>Tag <em>pisahkan dengan koma</em></label><input class="input" id="ugTag"></div>
+      <div class="bidang"><label>Privasi</label><div class="pil" id="ugPrivasi"><button data-v="private" class="aktif">Privat</button><button data-v="unlisted">Tidak publik</button><button data-v="public">Publik</button></div></div>
+      <div class="bidang"><label>Izin konten <em>program clipper / kampanye / izin tertulis</em></label><input class="input" id="ugSumberIzin" placeholder="mis. Kampanye Whop 'X Clips' atau link izin dari streamer"></div>
+      <label class="saklar" style="justify-content:flex-start;gap:10px"><input type="checkbox" id="ugAnak"> Video ini dibuat untuk anak-anak (wajib dijawab jujur sesuai aturan YouTube/COPPA)</label>
+      <label class="saklar" style="justify-content:flex-start;gap:10px"><input type="checkbox" id="ugIzin"> Saya pemilik konten ini atau punya izin dari pemiliknya untuk mengunggahnya.</label>
+    </div>
+  </div>
+  <div class="wiz-kaki"><span class="ket">Video tidak akan diunggah tanpa menekan tombol ini.</span><button class="tombol kedua" id="ugBatal">Batal</button><button class="tombol utama" id="ugKirim">Unggah sekarang</button></div>
+</div></div>
 <div class="tirai" id="wizard" hidden><div class="wiz">
   <div class="wiz-kepala"><img src="/aset/ikon.png" alt=""><div><h2>Pemasangan Studio Maliki</h2><small>Klip + Motion · gratis · jalan di laptopmu</small></div>
     <div class="wiz-langkah" id="wizTitik"><span>1 · persyaratan</span><span>2 · komponen</span><span>3 · sambungkan ai</span><span>4 · selesai</span></div></div>
@@ -1162,6 +1193,7 @@ zona.addEventListener('drop', (e) => e.dataTransfer.files[0] && unggah(e.dataTra
 const LK = {
   klip: [['UNDUH', /Mengunduh|Video:/], ['TRANSKRIP', /Transkripsi|Transkrip diambil|Bahasa terdeteksi|Memakai subtitle/], ['PILIH MOMEN', /Mencari momen|Meminta AI|Memakai \d+ momen|Meminta .* \(langganan\)/], ['RINGKAS', /Analisis selesai/], ['SELESAI', /Analisis selesai/]],
   render: [['SIAPKAN', /Render 1\//], ['RENDER', /Render \d+\//], ['SELESAI', /Selesai\./]],
+  unggah: [['SIAPKAN', /Mengunggah/], ['KIRIM', /Terkirim/], ['SELESAI', /Selesai:/]],
   motion: [['NASKAH', /menulis naskah|naskah\//], ['SUARA', /Adegan \d+|VoxCPM2|\.wav:/], ['ANIMASI', /Render gaya/], ['RENDER', /Rendered|Encoding|Selesai:/], ['SELESAI', /Selesai:/]],
 };
 function gambarLangkah(jenis, log, status) {
@@ -1179,7 +1211,7 @@ let idTerakhir = 0;
 function mulaiPantau(jenis) {
   const id = jenis === 'motion' ? 'Motion' : 'Klip';
   $('#proses' + id).classList.add('tampil');
-  if (jenis !== 'render') $('#hasil' + id).classList.remove('tampil');
+  if (jenis !== 'render' && jenis !== 'unggah') $('#hasil' + id).classList.remove('tampil');
   if (jenis === 'klip') { $('#studioRender').classList.remove('tampil'); $('#h-klip').classList.remove('ada-hasil'); $('#sumberRingkas').hidden = true; window.perbaruiBarRender?.(); }
   SIBUK = jenis; clearInterval(pantau); document.body.classList.add('bekerja');
   let gagalPantau = 0;
@@ -1233,6 +1265,61 @@ $('#tblMotion').onclick = async () => {
 $('#salinPrompt').onclick = (e) => { e.preventDefault(); salin(`Kamu penulis naskah video pendek berbahasa Indonesia. Topik: [TOPIK]. Tulis 4–7 adegan; adegan 1 hook; satu kalimat narasi per adegan maks 14 kata; judul layar 2–5 kata; jangan mengarang angka; adegan terakhir ajakan. Balas HANYA JSON: {"judul":"...","adegan":[{"judul":"2-5 kata","teks":"kalimat narasi","kunci":["kata"],"ikon":"🔥"}]}`); };
 
 // hasil
+// ── Unggah ke YouTube (selalu lewat review) ──
+const bukaTautan = (url) => buka(url);
+let UG = null;
+async function muatAkun() {
+  try {
+    const {youtube: y} = await api('/api/akun-unggah');
+    $('#statusYT').innerHTML = `<span class="stat">${y.klien ? '✅' : '⚪'} <b>Client OAuth</b> ${y.klien ? 'tersimpan' : 'belum diisi'}</span>` +
+      `<span class="stat">${y.terhubung ? '✅' : '⚪'} <b>Akun</b> ${y.terhubung ? esc(y.kanal || 'tersambung') : 'belum tersambung'}</span>`;
+    $('#tblMasukYT').hidden = !y.klien || y.terhubung; $('#tblPutusYT').hidden = !y.terhubung;
+    return y;
+  } catch { return {}; }
+}
+$('#tblSimpanKlienYT').onclick = async () => {
+  try { await api('/api/youtube-klien', {client_id: $('#ytClientId').value, client_secret: $('#ytClientSecret').value});
+    $('#ytClientSecret').value = ''; toast('Client tersimpan ✓'); muatAkun(); } catch (e) { toast(e.message, true); }
+};
+$('#tblMasukYT').onclick = async () => {
+  try { await api('/api/youtube-masuk', {}); toast('Halaman izin Google terbuka di browser. Setelah selesai, kembali ke sini.');
+    let n = 0; const t = setInterval(async () => { const y = await muatAkun(); if (y.terhubung || ++n > 120) clearInterval(t); }, 2500);
+  } catch (e) { toast(e.message, true); }
+};
+$('#tblPutusYT').onclick = async () => { try { await api('/api/youtube-putus', {}); toast('YouTube diputuskan'); muatAkun(); } catch (e) { toast(e.message, true); } };
+$$('[data-tautan-luar]').forEach((a) => a.onclick = (e) => { e.preventDefault(); buka(a.dataset.tautanLuar); });
+async function bukaUnggah(k) {
+  if (!k || !KLIP.h) return;
+  const y = await muatAkun();
+  if (!y.terhubung) { toast('Sambungkan akun YouTube dulu di Pengaturan AI → Akun unggah.', true); ke('pengaturan'); $('#kartuAkun').scrollIntoView({behavior: 'smooth'}); return; }
+  UG = {no: k.no, privasi: 'private'};
+  $('#ugKet').textContent = `klip ${k.no} · ${Math.round(k.selesai - k.mulai)} detik · akun ${y.kanal || 'YouTube'}`;
+  $('#ugVideo').src = `/berkas/klip/${KLIP.h.nama}/${k.file}`;
+  $('#ugJudul').value = (KLIP.judul[k.no] ?? k.judul ?? '').slice(0, 100);
+  const tag = (KLIP.h.info?.hashtag || []).map((t) => t.replace(/^#/, ''));
+  $('#ugDesk').value = `${k.caption || k.judul || ''}\n\n${tag.map((t) => '#' + t).join(' ')} #Shorts`.trim();
+  $('#ugTag').value = tag.join(', ');
+  $('#ugSumberIzin').value = ''; $('#ugIzin').checked = false; $('#ugAnak').checked = false;
+  $$('#ugPrivasi button').forEach((b) => b.classList.toggle('aktif', b.dataset.v === 'private'));
+  $('#ugHitung').textContent = `${$('#ugJudul').value.length}/100`;
+  $('#dlgUnggah').hidden = false;
+}
+const tutupUnggah = () => { $('#dlgUnggah').hidden = true; $('#ugVideo').pause(); UG = null; };
+$('#ugBatal').onclick = tutupUnggah;
+$('#ugJudul').oninput = () => { $('#ugHitung').textContent = `${$('#ugJudul').value.length}/100`; };
+$$('#ugPrivasi button').forEach((b) => b.onclick = () => { UG.privasi = b.dataset.v; $$('#ugPrivasi button').forEach((x) => x.classList.toggle('aktif', x === b)); });
+$('#ugKirim').onclick = async () => {
+  if (!UG) return;
+  if (!$('#ugIzin').checked) return toast('Centang dulu pernyataan izin konten.', true);
+  if (UG.privasi === 'public' && !confirm('Unggah sebagai PUBLIK? Video langsung bisa dilihat semua orang.')) return;
+  try {
+    await api('/api/unggah-klip', {platform: 'youtube', nama: KLIP.h.nama, no: UG.no, judul: $('#ugJudul').value, deskripsi: $('#ugDesk').value,
+      tag: $('#ugTag').value.split(',').map((t) => t.trim()).filter(Boolean), privasi: UG.privasi, untuk_anak: $('#ugAnak').checked,
+      sumber_izin: $('#ugSumberIzin').value, izin: true});
+    tutupUnggah(); toast('Mengunggah ke YouTube…'); mulaiPantau('unggah');
+  } catch (e) { toast(e.message, true); }
+};
+muatAkun();
 function tampilHasil(h) { if (!h) return; if (h.jenis === 'motion') return hasilMotion(h); hasilKlip(h); }
 // ── Klip: hasil analisis (kiri pemutar & ringkasan, kanan kartu klip) ──
 const KLIP = {h: null, pilih: new Set(), cari: '', filter: 0, urut: 'skor', judul: {}, aktif: null};
@@ -1341,7 +1428,9 @@ function gambarKlip() {
       <div class="sunting-sub" id="ss-${k.no}" hidden></div>
       <div class="trans" id="tr-${k.no}">${esc(k.kutipan)}</div>
       ${k.file ? `<div class="k-hasil"><video src="${base + k.file}?v=${Date.now()}" controls preload="metadata" playsinline></video><div><div class="eyebrow" style="margin-bottom:8px">sudah dirender</div>
-        <a class="tombol utama kecil" href="${base + k.file}" download data-jenis="klip" data-nama="${h.nama}" data-file="${k.file}">Unduh MP4</a></div></div>` : ''}
+        <a class="tombol utama kecil" href="${base + k.file}" download data-jenis="klip" data-nama="${h.nama}" data-file="${k.file}">Unduh MP4</a>
+        <button class="tombol kedua kecil" data-unggah="${k.no}" style="margin-top:8px">Unggah ke YouTube…</button>
+        ${(k.unggahan || []).map((u) => `<div class="catatan" style="margin:8px 0 0">✓ ${esc(u.platform)} · ${esc(u.privasi)} · <a href="#" data-tautan="${esc(u.url)}">${esc(u.url)}</a></div>`).join('')}</div></div>` : ''}
     </div>`).join('') : '<div class="kartu kosong"><b>Tidak ada klip yang cocok</b>Ubah kata kunci atau filter skor.</div>';
   $$('[data-c]').forEach((c) => c.onclick = (e) => { e.stopPropagation(); const n = +c.dataset.c; c.checked ? KLIP.pilih.add(n) : KLIP.pilih.delete(n); gambarKlip(); });
   $$('.ikh').forEach((it) => it.onclick = () => $('#kk-' + it.dataset.ke)?.scrollIntoView({behavior: 'smooth', block: 'center'}));
@@ -1363,6 +1452,8 @@ function gambarKlip() {
       };
     } catch (e) { toast(e.message, true); }
   });
+  $$('[data-unggah]').forEach((b) => b.onclick = () => bukaUnggah(klips.find((x) => x.no === +b.dataset.unggah)));
+  $$('[data-tautan]').forEach((a) => a.onclick = (e) => { e.preventDefault(); bukaTautan(a.dataset.tautan); });
   $$('[data-judul]').forEach((sp) => sp.oninput = () => { KLIP.judul[sp.dataset.judul] = sp.textContent.trim(); gambarKanvas(); });
   $$('[data-putar]').forEach((b) => b.onclick = () => {
     const k = klips.find((x) => x.no === +b.dataset.putar); const v = $('#vSumber'); if (!v) return;
@@ -1599,11 +1690,11 @@ async function muatRiwayat() {
   muatBeranda();
   try { const x = await api('/api/sistem-detail'); if (!x.wizard_selesai) bukaWizard(); } catch {}
   const s = await api('/api/status');
-  if (s.status === 'jalan' && s.jenis !== 'suara') { ke(s.jenis === 'render' ? 'klip' : s.jenis); mulaiPantau(s.jenis); } else idTerakhir = s.id;
+  if (s.status === 'jalan' && s.jenis !== 'suara') { ke(['render', 'unggah'].includes(s.jenis) ? 'klip' : s.jenis); mulaiPantau(s.jenis); } else idTerakhir = s.id;
   // proses yang dimulai dari luar jendela (mis. oleh Claude Code) ikut tampil otomatis
   setInterval(async () => {
     if (pantau) { try { await api('/api/status'); } catch {} return; }
-    try { const t = await api('/api/status'); if (t.status === 'jalan' && t.id !== idTerakhir && t.jenis !== 'suara') { idTerakhir = t.id; ke(t.jenis === 'render' ? 'klip' : t.jenis); mulaiPantau(t.jenis); } } catch {}
+    try { const t = await api('/api/status'); if (t.status === 'jalan' && t.id !== idTerakhir && t.jenis !== 'suara') { idTerakhir = t.id; ke(['render', 'unggah'].includes(t.jenis) ? 'klip' : t.jenis); mulaiPantau(t.jenis); } } catch {}
   }, 2000);
 })();
 </script>
@@ -1620,7 +1711,7 @@ async function muatRiwayat() {
 <script>
 // ── Audit 14 Nov: status proses global, tema, bilah render Klip, jendela diam ──
 (() => {
-  const JENIS = {klip: ['Menganalisis video', 'klip'], render: ['Merender klip', 'klip'], motion: ['Membuat video motion', 'motion'],
+  const JENIS = {klip: ['Menganalisis video', 'klip'], render: ['Merender klip', 'klip'], unggah: ['Mengunggah klip', 'klip'], motion: ['Membuat video motion', 'motion'],
     pasang: ['Memasang komponen', 'pengaturan'], suara: ['Menyiapkan suara', 'pengaturan']};
   let mulai = 0, idLalu = null;
   const pil = document.getElementById('pilKerja');

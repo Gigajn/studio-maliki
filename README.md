@@ -87,6 +87,15 @@ uv run studio/studio.py            # jendela aplikasi
 uv run studio/studio.py --browser  # atau buka di browser
 ```
 
+## Unggah ke YouTube Shorts (API resmi)
+Klip yang sudah dirender bisa diunggah langsung dari kartunya (**Unggah ke YouTube…**). Setiap unggahan selalu lewat layar review:
+judul, deskripsi, tag, privasi (bawaan **privat**), keterangan izin konten, dan centang "saya berhak mengunggah". Tanpa centang itu, Studio menolak.
+- Sambungkan di **Pengaturan AI → Akun unggah · YouTube** memakai OAuth client *Desktop app* dari proyek Google Cloud milikmu sendiri
+  (aktifkan YouTube Data API v3). Izin yang diminta hanya `youtube.upload`.
+- Kuota gratis 10.000 unit/hari; satu unggahan ±1.600 unit (±6 video/hari). Proyek yang belum diaudit Google hanya bisa mengunggah sebagai privat.
+- Token disimpan di `~/Studio Maliki/.rahasia/` (izin 600). Setiap unggahan dicatat di `~/Studio Maliki/unggah/riwayat.jsonl`.
+- Unggah hanya konten milikmu, dari program clipper/kampanye yang memberi izin, atau dengan izin tertulis pemiliknya.
+
 ## Bingkai mengikuti pembicara
 Pada fokus **Otomatis (wajah)**, Klip mendeteksi pergantian kamera di dalam klip, mencari wajah (depan dan samping) per adegan, lalu menggeser
 bingkai 9:16 mengikuti pembicara. Cocok untuk podcast multi-kamera.
