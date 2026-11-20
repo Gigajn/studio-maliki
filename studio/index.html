@@ -466,6 +466,7 @@ main{position:relative;z-index:1}
   .tombol:active,.pil button:active,.tile:active,.preset:active,.gaya:active,.pny:active{transform:none}
 }
 @media (max-width:900px){.grid2,.penyedia,.langkah{grid-template-columns:1fr}.kartu-klip,.video-besar{grid-template-columns:1fr}main{padding:18px 16px}}
+.grid-kandidat{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
 </style>
 </head>
 <body>
@@ -477,6 +478,7 @@ main{position:relative;z-index:1}
     <button class="nav" data-ke="motion"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="m10 8 6 4-6 4z"/></svg>Motion</button>
     <div class="label-kecil">Pustaka</div>
     <button class="nav" data-ke="kampanye"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>Kampanye</button>
+    <button class="nav" data-ke="live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8a6 6 0 0 1 0 8.4M7.8 16.2a6 6 0 0 1 0-8.4M19 5a10 10 0 0 1 0 14M5 19A10 10 0 0 1 5 5"/></svg>Live <span class="lencana" id="nLive" hidden style="margin-left:auto;padding:1px 7px;background:#e5484d;color:#fff">0</span></button>
     <button class="nav" data-ke="antrean"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/></svg>Antrean <span class="lencana" id="nAntrean" hidden style="margin-left:auto;padding:1px 7px">0</span></button>
     <button class="nav" data-ke="riwayat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>Riwayat</button>
     <button class="nav" data-ke="pengaturan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>Pengaturan AI</button>
@@ -717,6 +719,40 @@ main{position:relative;z-index:1}
         </div>
         <div id="daftarKampanye"></div>
       </div>
+    </section>
+
+    <section class="halaman" id="h-live">
+      <div class="kepala"><div><div class="eyebrow">pantau kanal · rekam · potong momen</div><h1>Live</h1>
+        <p>Studio mengecek kanal Twitch, YouTube, dan Kick tiap 2 menit lewat API resmi. Kanal yang <b>memberi izin</b> bisa direkam otomatis saat live;
+          momen dengan lonjakan chat atau suara dipotong jadi kandidat. Kandidat <b>tidak pernah diunggah otomatis</b>: proses jadi klip, lalu review dulu.</p></div>
+        <button class="tombol kedua" id="lvCek">Cek sekarang</button></div>
+      <div class="grid2">
+        <div>
+          <div class="kartu" style="margin-bottom:14px"><h2 class="judul-kartu"><i></i>tambah kanal</h2>
+            <div class="bidang"><label>Platform</label><div class="pil" id="lvPlatform"><button data-v="twitch" class="aktif">Twitch</button><button data-v="youtube">YouTube</button><button data-v="kick">Kick</button></div></div>
+            <div class="bidang"><label>Kanal <em id="lvPetunjuk">nama login, mis. namastreamer</em></label><input class="input" id="lvNama"></div>
+            <div class="bidang"><label>Bukti izin <em>wajib untuk rekam · link program clipper / izin tertulis</em></label><input class="input" id="lvIzin" placeholder="https://…"></div>
+            <div class="grid2" style="gap:10px"><div class="bidang"><label>Kampanye</label><select class="input" id="lvKampanye"></select></div>
+              <div class="bidang"><label>Batas rekam (jam)</label><input class="input" id="lvBatas" type="number" min="0.25" max="12" step="0.25" value="4"></div></div>
+            <label class="saklar" style="justify-content:flex-start;gap:10px"><input type="checkbox" id="lvAuto"> Rekam otomatis saat kanal ini live</label>
+            <div class="aksi"><button class="tombol utama" id="lvSimpan">Simpan kanal</button></div>
+          </div>
+          <details class="kartu akun"><summary><b>Kunci API</b> <span id="lvStatusKunci" style="color:var(--redup);font-size:13px"></span></summary>
+            <p style="color:var(--redup);font-size:13px">Twitch: buat aplikasi di <a href="#" data-buka="https://dev.twitch.tv/console/apps">dev.twitch.tv</a>.
+              Kick: buat aplikasi di <a href="#" data-buka="https://kick.com/settings/developer">kick.com</a>. YouTube: pakai akun yang sudah tersambung di Pengaturan, atau API key.
+              Kunci hanya disimpan di laptop ini.</p>
+            <div class="grid2" style="gap:10px"><div class="bidang"><label>Twitch Client ID</label><input class="input" id="lvTwId"></div>
+              <div class="bidang"><label>Twitch Client Secret</label><input class="input" id="lvTwRahasia" type="password"></div>
+              <div class="bidang"><label>Kick Client ID</label><input class="input" id="lvKiId"></div>
+              <div class="bidang"><label>Kick Client Secret</label><input class="input" id="lvKiRahasia" type="password"></div></div>
+            <div class="bidang"><label>YouTube API key <em>opsional</em></label><input class="input" id="lvYtKunci" type="password"></div>
+            <div class="aksi"><button class="tombol kedua" id="lvSimpanKunci">Simpan kunci</button></div>
+          </details>
+        </div>
+        <div><div id="lvGalat"></div><div id="daftarKanal"></div></div>
+      </div>
+      <h2 class="judul-kartu" style="margin-top:18px"><i></i>kandidat momen</h2>
+      <div id="daftarKandidat" class="grid-kandidat"></div>
     </section>
 
     <section class="halaman" id="h-antrean">
@@ -1031,7 +1067,7 @@ $('#wizLanjut').onclick = () => { if (WIZ.langkah === 4) return tutupWizard(); W
 $('#wizKembali').onclick = () => { WIZ.langkah = Math.max(1, WIZ.langkah - 1); gambarWizard(); };
 $$('[data-wiz-ke]').forEach((k) => k.onclick = () => tutupWizard(k.dataset.wizKe));
 $('#bukaWizard').onclick = () => bukaWizard();
-function ke(h) { $$('.nav').forEach((n) => n.classList.toggle('aktif', n.dataset.ke === h)); $$('.halaman').forEach((x) => x.classList.toggle('aktif', x.id === 'h-' + h)); if (h === 'beranda') muatBeranda(); if (h === 'antrean') muatAntrean(); if (h === 'kampanye') muatKampanye();
+function ke(h) { $$('.nav').forEach((n) => n.classList.toggle('aktif', n.dataset.ke === h)); $$('.halaman').forEach((x) => x.classList.toggle('aktif', x.id === 'h-' + h)); if (h === 'beranda') muatBeranda(); if (h === 'antrean') muatAntrean(); if (h === 'kampanye') muatKampanye(); if (h === 'live') muatLive();
   if (h === 'pengaturan') muatStatusAI();
   if (h === 'riwayat') { muatRiwayat(); $('#cariRiwayat').oninput = muatRiwayat; } if (h === 'pengaturan') muatPengaturan(); }
 $$('.nav').forEach((n) => n.onclick = () => ke(n.dataset.ke));
@@ -1533,6 +1569,68 @@ $('#kmSimpan').onclick = async () => {
     toast('Kampanye tersimpan ✓'); isiFormKampanye(); muatKampanye();
   } catch (e) { toast(e.message, true); }
 };
+
+// ── Halaman Live ──
+const NAMA_LIVE = {twitch: 'Twitch', youtube: 'YouTube', kick: 'Kick'};
+const PETUNJUK_LIVE = {twitch: 'nama login, mis. namastreamer', youtube: 'ID kanal (UC…) atau @handle', kick: 'slug kanal, mis. namastreamer'};
+$$('#lvPlatform button').forEach((b) => b.onclick = () => { $$('#lvPlatform button').forEach((x) => x.classList.toggle('aktif', x === b)); $('#lvPetunjuk').textContent = PETUNJUK_LIVE[b.dataset.v]; });
+$$('[data-buka]').forEach((a) => a.onclick = (e) => { e.preventDefault(); buka(a.dataset.buka); });
+let LIVE = null;
+async function muatLive(diam) {
+  let d; try { d = await api('/api/live'); } catch { return; }
+  LIVE = d;
+  const live = d.kanal.filter((k) => k.live).length;
+  $('#nLive').hidden = !live; $('#nLive').textContent = live;
+  if (!$('#h-live').classList.contains('aktif') && diam) return;
+  const ks = d.kunci; $('#lvStatusKunci').textContent = ['twitch', 'kick', 'youtube'].map((p) => `${NAMA_LIVE[p]} ${ks[p] ? '✓' : '—'}`).join(' · ');
+  if (!$('#lvKampanye').dataset.isi) {
+    try { KAMPANYE = (await api('/api/kampanye')).kampanye; } catch {}
+    $('#lvKampanye').innerHTML = '<option value="">Tanpa kampanye</option>' + KAMPANYE.map((k) => `<option value="${esc(k.id)}">${esc(k.nama)}</option>`).join('');
+    $('#lvKampanye').dataset.isi = '1';
+  }
+  $('#lvGalat').innerHTML = Object.entries(d.galat || {}).map(([p, g]) => `<div class="kartu" style="margin-bottom:10px;border-color:#e5484d"><b>${esc(NAMA_LIVE[p] || 'Pemantau')}:</b> ${esc(g)}</div>`).join('');
+  $('#daftarKanal').innerHTML = d.kanal.length ? d.kanal.map((k) => `<div class="kartu" style="margin-bottom:10px">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <span class="lencana" style="${k.live ? 'background:#e5484d;color:#fff' : ''}">${k.live ? '● LIVE' : 'offline'}</span>
+        <b style="flex:1">${esc(k.label)} <small style="color:var(--redup)">${esc(NAMA_LIVE[k.platform])}</small></b>
+        ${k.merekam ? `<span class="lencana">⏺ merekam</span><button class="tombol kedua kecil" data-lvhenti="${esc(k.id)}">Hentikan</button>`
+          : (k.live && k.izin ? `<button class="tombol utama kecil" data-lvrekam="${esc(k.id)}">Rekam</button>` : '')}
+        <button class="tombol kedua kecil" data-lvhapus="${esc(k.id)}">Hapus</button></div>
+      ${k.live ? `<div style="margin-top:6px;font-size:13px">${esc(k.judul_live)} · ${Number(k.penonton || 0).toLocaleString('id-ID')} penonton</div>` : ''}
+      <small style="color:var(--redup)">${k.izin ? 'Izin: ' + esc(k.izin) : 'Belum ada bukti izin: hanya dipantau, tidak direkam.'}${k.auto_rekam ? ' · rekam otomatis' : ''}${k.terakhir_cek ? ' · cek ' + waktuLokal(k.terakhir_cek) : ''}</small>
+    </div>`).join('') : '<div class="kartu kosong"><b>Belum ada kanal</b>Tambahkan streamer yang ikut program clipper atau sudah memberimu izin.</div>';
+  $('#daftarKandidat').innerHTML = d.kandidat.length ? d.kandidat.map((c) => { const kn = d.kanal.find((k) => k.id === c.kanal);
+    const q = `data-kanal="${esc(c.kanal)}" data-sesi="${esc(c.sesi)}" data-file="${esc(c.file)}"`;
+    return `<div class="kartu"><video src="/berkas/live/${encodeURIComponent(c.kanal)}/${encodeURIComponent(c.sesi)}/${encodeURIComponent(c.file)}" controls preload="metadata" style="width:100%;border-radius:8px;background:#000;aspect-ratio:16/9"></video>
+      <div style="margin:8px 0 4px"><b>${esc(kn?.label || c.kanal)}</b> <span class="lencana">${c.alasan === 'chat' ? '💬 lonjakan chat' : '🔊 lonjakan suara'}</span> <span class="lencana">skor ${Math.round((c.skor || 0) * 100)}</span></div>
+      <small style="color:var(--redup)">${waktuLokal(c.waktu)} · ${c.durasi || ''} dtk</small>
+      <div class="aksi"><button class="tombol utama kecil" data-lvproses ${q}>Proses jadi klip</button><button class="tombol kedua kecil" data-lvbuang ${q}>Buang</button></div></div>`; }).join('')
+    : '<div class="kartu kosong"><b>Belum ada kandidat</b>Kandidat muncul di sini saat rekaman menemukan momen ramai.</div>';
+  $$('[data-lvrekam]').forEach((b) => b.onclick = async () => { try { await api('/api/live-rekam', {id: b.dataset.lvrekam}); toast('Mulai merekam ⏺'); muatLive(); } catch (e) { toast(e.message, true); } });
+  $$('[data-lvhenti]').forEach((b) => b.onclick = async () => { b.disabled = true; await api('/api/live-henti', {id: b.dataset.lvhenti}).catch(() => {}); muatLive(); });
+  $$('[data-lvhapus]').forEach((b) => b.onclick = async () => { if (!confirm('Hapus kanal ini dari pantauan?')) return; await api('/api/live-hapus', {id: b.dataset.lvhapus}); muatLive(); });
+  $$('[data-lvbuang]').forEach((b) => b.onclick = async () => { await api('/api/live-buang', {...b.dataset}).catch((e) => toast(e.message, true)); muatLive(); });
+  $$('[data-lvproses]').forEach((b) => b.onclick = async () => {
+    try { b.disabled = true; const r = await api('/api/live-proses', {kanal: b.dataset.kanal, sesi: b.dataset.sesi, file: b.dataset.file});
+      toast('Kandidat masuk antrean analisis. Hasilnya muncul di Riwayat untuk direview.'); sesudahAntre(r, 'klip'); } catch (e) { b.disabled = false; toast(e.message, true); } });
+}
+$('#lvCek').onclick = async () => { $('#lvCek').disabled = true; try { await api('/api/live-cek', {}); } catch (e) { toast(e.message, true); } $('#lvCek').disabled = false; muatLive(); };
+$('#lvSimpan').onclick = async () => {
+  try {
+    await api('/api/live-kanal', {platform: $('#lvPlatform button.aktif').dataset.v, nama: $('#lvNama').value, izin: $('#lvIzin').value,
+      kampanye: $('#lvKampanye').value, batas_jam: $('#lvBatas').value, auto_rekam: $('#lvAuto').checked});
+    toast('Kanal tersimpan ✓'); $('#lvNama').value = ''; muatLive();
+  } catch (e) { toast(e.message, true); }
+};
+$('#lvSimpanKunci').onclick = async () => {
+  try {
+    const r = await api('/api/live-kunci', {twitch_id: $('#lvTwId').value || null, twitch_rahasia: $('#lvTwRahasia').value || null,
+      kick_id: $('#lvKiId').value || null, kick_rahasia: $('#lvKiRahasia').value || null, youtube_kunci: $('#lvYtKunci').value || null});
+    ['#lvTwId', '#lvTwRahasia', '#lvKiId', '#lvKiRahasia', '#lvYtKunci'].forEach((x) => $(x).value = '');
+    toast('Kunci tersimpan ✓'); muatLive();
+  } catch (e) { toast(e.message, true); }
+};
+setInterval(() => muatLive(true), 15000); setTimeout(() => muatLive(true), 800);
 
 // ── Halaman Antrean ──
 const LABEL_STATUS = {menunggu: '⏳ menunggu', jalan: '▶ berjalan', selesai: '✓ selesai', gagal: '✕ gagal', batal: '⊘ dibatalkan'};

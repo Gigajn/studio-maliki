@@ -31,6 +31,7 @@ sys.path.insert(0, str(AKAR))
 import unggah as UNGGAH  # noqa: E402  (pustaka standar saja)
 from antrean import Antrean, Kerja  # noqa: E402
 import caption as CAPTION  # noqa: E402
+import live as LIVE  # noqa: E402
 import unggah_instagram as IG  # noqa: E402
 import unggah_tiktok as TT  # noqa: E402
 
@@ -170,7 +171,8 @@ PERINTAH_LOGIN = {"claude": "claude auth login", "codex": "codex login", "openco
 DOMAIN_BOLEH = ("aistudio.google.com", "ollama.com", "nodejs.org", "platform.openai.com",
                 "openrouter.ai", "console.groq.com", "chatgpt.com", "claude.ai", "opencode.ai", "docs.astral.sh",
                 "youtube.com", "www.youtube.com", "studio.youtube.com", "console.cloud.google.com",
-                "developers.tiktok.com", "www.tiktok.com", "developers.facebook.com", "www.instagram.com")
+                "developers.tiktok.com", "www.tiktok.com", "developers.facebook.com", "www.instagram.com",
+                "dev.twitch.tv", "www.twitch.tv", "kick.com", "docs.kick.com")
 
 
 def cari_cli(nama: str) -> str | None:
@@ -729,6 +731,41 @@ ANTREAN = Antrean(DATA / "antrean.json", {"utama": KERJA, "unggah": KERJA_UNGGAH
                   jeda_platform)
 
 
+# ── Live: pantau kanal yang memberi izin, rekam, dan potong kandidat momen (lihat live.py) ──
+def jalankan_rekam(k: dict, folder: Path) -> subprocess.Popen:
+    if LIVE.ruang_kosong_gb(DATA) < 5:
+        raise RuntimeError("Ruang disk kurang dari 5 GB. Kosongkan dulu sebelum merekam live.")
+    cmd = [*jalankan_skrip(KLIP / "rekam_live.py"), "--url", k["url_live"], "--folder", str(folder),
+           "--platform", k["platform"], "--nama", k["nama"], "--batas-jam", str(k.get("batas_jam", 4))]
+    log = open(folder / "rekam.log", "ab")
+    kw = {"creationflags": 0x08000000} if os.name == "nt" else {}  # tanpa jendela konsol di Windows
+    return subprocess.Popen(cmd, cwd=str(KLIP), env=lingkungan_kerja(), stdin=subprocess.DEVNULL, stdout=log,
+                            stderr=subprocess.STDOUT, **kw)
+
+
+PEMANTAU = LIVE.Pemantau(DATA, jalankan_rekam, token_youtube=lambda: UNGGAH.token_segar(DATA))
+
+
+def rekam_live(d: dict) -> dict:
+    k = next((x for x in PEMANTAU.kanal() if x["id"] == d.get("id")), None)
+    if not k:
+        raise ValueError("Kanal tidak ditemukan.")
+    return PEMANTAU.mulai_rekam(k)
+
+
+def proses_kandidat(d: dict) -> dict:
+    """Kandidat momen → analisis klip biasa (transkrip, judul, caption), lalu review seperti klip lain."""
+    p = PEMANTAU.berkas_kandidat(str(d.get("kanal", "")), str(d.get("sesi", "")), str(d.get("file", "")))
+    k = next((x for x in PEMANTAU.kanal() if x["id"] == d.get("kanal")), {})
+    durasi = int(min(max(float(d.get("durasi") or 40), 15), 60))
+    out = mulai_klip({"sumber": str(p), "jumlah": 1, "durasi": durasi, "ai": d.get("ai"),
+                      "arahan": f"Potongan live {k.get('label', '')}. Sumber izin: {k.get('izin', '')}"[:300]})
+    (DATA / "klip" / out["proyek"] / "live.json").write_text(json.dumps(
+        {"kanal": k.get("label"), "platform": k.get("platform"), "izin": k.get("izin"), "kampanye": k.get("kampanye"),
+         "url": k.get("url_live"), "kandidat": p.name}, ensure_ascii=False), encoding="utf-8")
+    return out
+
+
 # ── HTTP ────────────────────────────────────────────────────────────────────
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a):
@@ -831,6 +868,13 @@ class H(BaseHTTPRequestHandler):
                 return self._json(ANTREAN.daftar())
             if jalur == "/api/akun-unggah":
                 return self._json(status_akun())
+            if jalur == "/api/live":
+                return self._json(PEMANTAU.ringkas())
+            if m := re.match(r"^/berkas/live/([\w-]+)/([\w-]+)/(kandidat-\d+\.mp4)$", jalur):
+                try:
+                    return self._file(PEMANTAU.berkas_kandidat(*m.groups()))
+                except ValueError:
+                    return self._json({"galat": "tidak ditemukan"}, 404)
             if m := re.match(r"^/api/jejak/([\w-]+)/(\d+)$", jalur):
                 return self._json(jejak_klip(m.group(1), int(m.group(2))))
             if m := re.match(r"^/api/proyek/(klip|motion)/([\w-]+)$", jalur):
@@ -945,6 +989,25 @@ class H(BaseHTTPRequestHandler):
                 return self._json(ANTREAN.ulangi(str(d.get("id", ""))))
             if jalur == "/api/unggah-klip":
                 return self._json(mulai_unggah(d))
+            if jalur == "/api/live-kunci":
+                return self._json(PEMANTAU.simpan_kunci(d))
+            if jalur == "/api/live-kanal":
+                return self._json({"kanal": PEMANTAU.simpan_kanal(d)})
+            if jalur == "/api/live-hapus":
+                PEMANTAU.hapus_kanal(str(d.get("id", "")))
+                return self._json({"ok": True})
+            if jalur == "/api/live-cek":
+                PEMANTAU.cek()
+                return self._json(PEMANTAU.ringkas())
+            if jalur == "/api/live-rekam":
+                return self._json(rekam_live(d))
+            if jalur == "/api/live-henti":
+                return self._json({"ok": PEMANTAU.hentikan(str(d.get("id", "")))})
+            if jalur == "/api/live-buang":
+                PEMANTAU.buang_kandidat(str(d.get("kanal", "")), str(d.get("sesi", "")), str(d.get("file", "")))
+                return self._json({"ok": True})
+            if jalur == "/api/live-proses":
+                return self._json(proses_kandidat(d))
             if jalur == "/api/hapus-proyek":
                 f = (DATA / d.get("jenis", "") / re.sub(r"[^\w-]", "", d.get("nama", ""))).resolve()
                 if f.is_dir() and DATA.resolve() in f.parents and f.parent.name in ("klip", "motion"):
@@ -963,6 +1026,7 @@ class H(BaseHTTPRequestHandler):
                 shutil.copy(f, tujuan)
                 return self._json({"jalur": str(tujuan)})
             if jalur == "/api/matikan":
+                PEMANTAU.hentikan_semua()
                 KERJA.batal()
                 KERJA_UNGGAH.batal()
                 threading.Timer(0.3, lambda: os._exit(0)).start()
@@ -1019,6 +1083,7 @@ def main():
     global PORT
     DATA.mkdir(parents=True, exist_ok=True)
     ANTREAN.mulai()
+    PEMANTAU.mulai()
     # Port 8787 bisa dipakai aplikasi lain (mis. server pengembangan). Cari Studio yang sudah jalan,
     # kalau tidak ada, pakai port kosong pertama dari 8787–8806.
     sudah, srv = False, None
@@ -1112,6 +1177,7 @@ def main():
     webview.create_window("Studio Maliki", url, width=1360, height=880, min_size=(900, 640),
                           background_color="#07090F", js_api=Jembatan())
     webview.start(setelah_mulai)
+    PEMANTAU.hentikan_semua()
     KERJA.batal()
     KERJA_UNGGAH.batal()
     os._exit(0)
