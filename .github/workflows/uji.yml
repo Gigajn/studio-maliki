@@ -1,0 +1,53 @@
+# Uji otomatis tiap pull request dan push ke main: pemeriksaan statis + semua uji di folder uji/ (tanpa akun asli,
+# semua API medsos memakai server tiruan). Uji installer Windows tetap manual (uji-windows.yml).
+name: Uji
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: uji-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  uji:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+      - name: Pasang ffmpeg dan pyflakes
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
+          python -m pip install -q pyflakes==4.1.0
+      - name: Pemeriksaan statis Python
+        run: python -m pyflakes studio/antrean.py studio/caption.py studio/live.py studio/statistik.py studio/unggah.py studio/unggah_tiktok.py studio/unggah_instagram.py klip/rekam_live.py uji/uji_live.py uji/uji_statistik.py uji/uji_platform.py uji/uji_caption.py uji/uji_antrean.py
+      - name: Sintaks JavaScript halaman Studio
+        run: |
+          python - <<'PY'
+          import re, pathlib
+          html = pathlib.Path("studio/index.html").read_text(encoding="utf-8")
+          js = "\n;\n".join(re.findall(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", html, re.S))
+          pathlib.Path("/tmp/studio.js").write_text(js, encoding="utf-8")
+          PY
+          node --check /tmp/studio.js
+      - name: Uji
+        run: |
+          mkdir -p ~/Downloads
+          gagal=0
+          for t in uji_server uji_antrean uji_caption uji_unggah uji_platform uji_statistik uji_live; do
+            echo "::group::$t"
+            python uji/$t.py || gagal=1
+            echo "::endgroup::"
+          done
+          exit $gagal

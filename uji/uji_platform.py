@@ -3,7 +3,6 @@ import json
 import sys
 import tempfile
 import threading
-import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
