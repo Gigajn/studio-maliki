@@ -471,6 +471,7 @@ main{position:relative;z-index:1}
     <button class="nav" data-ke="klip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12"/></svg>Klip</button>
     <button class="nav" data-ke="motion"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="m10 8 6 4-6 4z"/></svg>Motion</button>
     <div class="label-kecil">Pustaka</div>
+    <button class="nav" data-ke="antrean"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/></svg>Antrean <span class="lencana" id="nAntrean" hidden style="margin-left:auto;padding:1px 7px">0</span></button>
     <button class="nav" data-ke="riwayat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>Riwayat</button>
     <button class="nav" data-ke="pengaturan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>Pengaturan AI</button>
     <div class="pil-kerja" id="pilKerja" hidden>
@@ -687,6 +688,14 @@ main{position:relative;z-index:1}
     </section>
 
     <!-- PENGATURAN -->
+    <section class="halaman" id="h-antrean">
+      <div class="kepala"><div><div class="eyebrow">antrean kerja · tersimpan di laptopmu</div><h1>Antrean</h1>
+        <p>Analisis, render, dan unggah masuk antrean. Jalur <b>utama</b> (analisis/render/motion) dan jalur <b>unggah</b> berjalan bersamaan.
+          Tugas yang menunggu tetap ada walau Studio ditutup.</p></div></div>
+      <div class="ringkas" id="jalurAntrean" style="margin-bottom:14px"></div>
+      <div id="daftarAntrean"></div>
+    </section>
+
     <section class="halaman" id="h-pengaturan">
       <div class="kepala"><div><div class="eyebrow">bawa ai-mu sendiri</div><h1>Pengaturan AI</h1><p>Studio tidak menyediakan AI. Sambungkan AI yang kamu punya; kunci disimpan hanya di laptop ini.</p></div></div>
       <div class="kartu" style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
@@ -941,7 +950,7 @@ $('#wizLanjut').onclick = () => { if (WIZ.langkah === 4) return tutupWizard(); W
 $('#wizKembali').onclick = () => { WIZ.langkah = Math.max(1, WIZ.langkah - 1); gambarWizard(); };
 $$('[data-wiz-ke]').forEach((k) => k.onclick = () => tutupWizard(k.dataset.wizKe));
 $('#bukaWizard').onclick = () => bukaWizard();
-function ke(h) { $$('.nav').forEach((n) => n.classList.toggle('aktif', n.dataset.ke === h)); $$('.halaman').forEach((x) => x.classList.toggle('aktif', x.id === 'h-' + h)); if (h === 'beranda') muatBeranda();
+function ke(h) { $$('.nav').forEach((n) => n.classList.toggle('aktif', n.dataset.ke === h)); $$('.halaman').forEach((x) => x.classList.toggle('aktif', x.id === 'h-' + h)); if (h === 'beranda') muatBeranda(); if (h === 'antrean') muatAntrean();
   if (h === 'pengaturan') muatStatusAI();
   if (h === 'riwayat') { muatRiwayat(); $('#cariRiwayat').oninput = muatRiwayat; } if (h === 'pengaturan') muatPengaturan(); }
 $$('.nav').forEach((n) => n.onclick = () => ke(n.dataset.ke));
@@ -1240,26 +1249,29 @@ $('#tblMatikan').onclick = async () => {
 };
 $$('[data-batal]').forEach((b) => b.onclick = () => api('/api/batal', {}));
 
+// Tugas langsung jalan bila jalurnya kosong; kalau tidak, masuk antrean dan otomatis tampil saat mulai.
+function sesudahAntre(r, jenis) {
+  if (r && r.status === 'menunggu') return toast(`Masuk antrean (urutan ke-${r.posisi}). Pantau di menu Antrean.`);
+  mulaiPantau(jenis);
+}
 $('#tblKlip').onclick = async () => {
-  if (SIBUK) return toast(`Masih memproses ${SIBUK === 'motion' ? 'Motion' : 'klip'} — tunggu selesai atau tekan Batalkan dulu.`, true);
   if (!$('#sumber').value.trim()) return toast('Tempel link YouTube atau pilih file video dulu.', true);
   try {
     const khusus = nilaiPil('#pilRentang') === 'khusus';
     if (nilaiPil('#pilSub') === 'srt' && !SRT) return toast('Pilih berkas .srt dulu.', true);
-    await api('/api/klip', {sumber: $('#sumber').value, jumlah: +$('#jumlah').value, durasi: +nilaiPil('#pilDurasi'), ai: nilaiPil('#pilAI'),
+    const r = await api('/api/klip', {sumber: $('#sumber').value, jumlah: +$('#jumlah').value, durasi: +nilaiPil('#pilDurasi'), ai: nilaiPil('#pilAI'),
       model: nilaiPil('#pilModel'), arahan: $('#arahan').value,
       rentang: khusus ? `${$('#rentangA').value.trim()}-${$('#rentangB').value.trim()}` : '',
       subtitle_file: nilaiPil('#pilSub') === 'srt' ? SRT : ''});
-    mulaiPantau('klip');
+    sesudahAntre(r, 'klip');
   } catch (e) { toast(e.message, true); }
 };
 $('#tblMotion').onclick = async () => {
-  if (SIBUK) return toast(`Masih memproses ${SIBUK === 'motion' ? 'Motion' : 'klip'} — tunggu selesai atau tekan Batalkan dulu.`, true);
   try {
     const isi = nilaiPil('#pilIsi');
-    await api('/api/motion', {topik: isi === 'topik' ? $('#topik').value : '', naskah: isi === 'naskah' ? $('#naskahJSON').value : '',
+    const r = await api('/api/motion', {topik: isi === 'topik' ? $('#topik').value : '', naskah: isi === 'naskah' ? $('#naskahJSON').value : '',
       gaya: $('#pilGaya .aktif').dataset.v, ai: PENG.AI || 'lokal', gambar: $('#gGambarAI').checked});
-    mulaiPantau('motion');
+    sesudahAntre(r, 'motion');
   } catch (e) { toast(e.message, true); }
 };
 $('#salinPrompt').onclick = (e) => { e.preventDefault(); salin(`Kamu penulis naskah video pendek berbahasa Indonesia. Topik: [TOPIK]. Tulis 4–7 adegan; adegan 1 hook; satu kalimat narasi per adegan maks 14 kata; judul layar 2–5 kata; jangan mengarang angka; adegan terakhir ajakan. Balas HANYA JSON: {"judul":"...","adegan":[{"judul":"2-5 kata","teks":"kalimat narasi","kunci":["kata"],"ikon":"🔥"}]}`); };
@@ -1316,10 +1328,43 @@ $('#ugKirim').onclick = async () => {
     await api('/api/unggah-klip', {platform: 'youtube', nama: KLIP.h.nama, no: UG.no, judul: $('#ugJudul').value, deskripsi: $('#ugDesk').value,
       tag: $('#ugTag').value.split(',').map((t) => t.trim()).filter(Boolean), privasi: UG.privasi, untuk_anak: $('#ugAnak').checked,
       sumber_izin: $('#ugSumberIzin').value, izin: true});
-    tutupUnggah(); toast('Mengunggah ke YouTube…'); mulaiPantau('unggah');
+    muatAntrean();
+    tutupUnggah(); toast('Masuk antrean unggah. Render tetap bisa jalan. Pantau di menu Antrean.');
   } catch (e) { toast(e.message, true); }
 };
 muatAkun();
+// ── Halaman Antrean ──
+const LABEL_STATUS = {menunggu: '⏳ menunggu', jalan: '▶ berjalan', selesai: '✓ selesai', gagal: '✕ gagal', batal: '⊘ dibatalkan'};
+const waktuLokal = (t) => t ? new Date(t * 1000).toLocaleString('id-ID', {day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'}) : '';
+let ANTRE_LALU = {};
+async function muatAntrean() {
+  let d; try { d = await api('/api/antrean'); } catch { return; }
+  const aktif = d.tugas.filter((t) => t.status === 'menunggu' || t.status === 'jalan').length;
+  $('#nAntrean').hidden = !aktif; $('#nAntrean').textContent = aktif;
+  // unggahan yang baru selesai untuk proyek yang sedang dibuka → segarkan kartu klipnya
+  for (const t of d.tugas) {
+    if (ANTRE_LALU[t.id] === 'jalan' && t.status !== 'jalan') {
+      if (t.jenis === 'unggah') toast(t.status === 'selesai' ? `Terunggah ✓ ${t.label}` : `Unggah gagal: ${t.galat || t.label}`, t.status !== 'selesai');
+      if (t.jenis === 'unggah' && KLIP.h && t.info?.proyek === KLIP.h.nama) { try { hasilKlip(await api(`/api/proyek/klip/${KLIP.h.nama}`)); } catch {} }
+    }
+    ANTRE_LALU[t.id] = t.status;
+  }
+  if (!$('#h-antrean').classList.contains('aktif')) return;
+  $('#jalurAntrean').innerHTML = Object.entries(d.jalur).map(([j, st]) => `<span class="stat">${st === 'jalan' ? '▶' : '⚪'} <b>jalur ${esc(j)}</b> ${st === 'jalan' ? 'sibuk' : 'siap'}</span>`).join('');
+  $('#daftarAntrean').innerHTML = d.tugas.length ? d.tugas.map((t) => `<div class="kartu" style="margin-bottom:10px;padding:14px 16px">
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><b style="flex:1;min-width:200px">${esc(t.label)}</b>
+        <span class="lencana">${esc(t.jalur)}</span><span class="lencana">${LABEL_STATUS[t.status] || esc(t.status)}</span>
+        ${t.jadwal && t.status === 'menunggu' ? `<span class="lencana">🕒 ${waktuLokal(t.jadwal)}</span>` : ''}
+        ${t.status === 'menunggu' || t.status === 'jalan' ? `<button class="tombol kedua kecil" data-abatal="${esc(t.id)}">Batalkan</button>` : ''}
+        ${t.status === 'gagal' || t.status === 'batal' ? `<button class="tombol kedua kecil" data-aulang="${esc(t.id)}">Ulangi</button>` : ''}</div>
+      <small style="color:var(--redup)">dibuat ${waktuLokal(t.dibuat)}${t.selesai ? ' · selesai ' + waktuLokal(t.selesai) : ''}</small>
+      ${t.galat ? `<div class="catatan" style="margin:8px 0 0;color:var(--merah)">${esc(t.galat)}</div>` : ''}
+      ${t.status === 'jalan' && t.log?.length ? `<div class="log" style="max-height:90px">${esc(t.log.slice(-4).join('\n'))}</div>` : ''}
+    </div>`).join('') : '<div class="kartu kosong"><b>Antrean kosong</b>Tugas analisis, render, dan unggah akan muncul di sini.</div>';
+  $$('[data-abatal]').forEach((b) => b.onclick = async () => { await api('/api/antrean-batal', {id: b.dataset.abatal}).catch((e) => toast(e.message, true)); muatAntrean(); });
+  $$('[data-aulang]').forEach((b) => b.onclick = async () => { try { await api('/api/antrean-ulang', {id: b.dataset.aulang}); toast('Masuk antrean lagi'); } catch (e) { toast(e.message, true); } muatAntrean(); });
+}
+setInterval(muatAntrean, 2000); setTimeout(muatAntrean, 300);
 function tampilHasil(h) { if (!h) return; if (h.jenis === 'motion') return hasilMotion(h); hasilKlip(h); }
 // ── Klip: hasil analisis (kiri pemutar & ringkasan, kanan kartu klip) ──
 const KLIP = {h: null, pilih: new Set(), cari: '', filter: 0, urut: 'skor', judul: {}, aktif: null};
@@ -1646,7 +1691,8 @@ function mulaiKanvas() { cancelAnimationFrame(animKanvas); const loop = () => { 
 $('#tblRender').onclick = async () => {
   if (!KLIP.h) return;
   try {
-    await api('/api/klip-render', {nama: KLIP.h.nama, pilih: [...KLIP.pilih], gaya: G, judul: KLIP.judul});
+    const r = await api('/api/klip-render', {nama: KLIP.h.nama, pilih: [...KLIP.pilih], gaya: G, judul: KLIP.judul});
+    if (r.status === 'menunggu') return sesudahAntre(r, 'render');
     toast(`Merender ${KLIP.pilih.size} klip…`); mulaiPantau('render');
     $('#prosesKlip').scrollIntoView({behavior: 'smooth', block: 'center'});
   } catch (e) { toast(e.message, true); }

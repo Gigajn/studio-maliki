@@ -29,6 +29,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 AKAR = Path(__file__).resolve().parent
 sys.path.insert(0, str(AKAR))
 import unggah as UNGGAH  # noqa: E402  (pustaka standar saja)
+from antrean import Antrean, Kerja  # noqa: E402
 
 ALAT = AKAR.parent
 KLIP = ALAT / "klip"
@@ -60,7 +61,8 @@ DATA = Path(os.environ.get("STUDIO_DATA", Path.home() / "Studio Maliki"))
 ENV = DATA / "pengaturan.env"
 PORT = int(os.environ.get("STUDIO_PORT", "8787"))
 KUNCI = ["SUARA", "VOXCPM_MODE", "VOXCPM_DESAIN", "AI", "LANGGANAN", "OPENCODE_MODEL", "CLAUDE_CODE_MODEL", "CODEX_MODEL", "GEMINI_API_KEY", "GEMINI_MODEL",
-         "OPENAI_BASE_URL", "OPENAI_API_KEY", "OPENAI_MODEL", "SUARA_MAC", "TEMA", "PIXABAY_API_KEY"]
+         "OPENAI_BASE_URL", "OPENAI_API_KEY", "OPENAI_MODEL", "SUARA_MAC", "TEMA", "PIXABAY_API_KEY",
+         "JEDA_POSTING_MENIT"]
 BAWAAN = {"SUARA": "bawaan", "VOXCPM_MODE": "bawaan", "AI": "lokal", "LANGGANAN": "claude-code", "GEMINI_MODEL": "gemini-3.8-flash",
           "OPENAI_BASE_URL": "http://localhost:11434/v1", "OPENAI_MODEL": "gemma3:4b", "SUARA_MAC": "Damayanti"}
 
@@ -96,72 +98,23 @@ def samarkan(p: dict) -> dict:
     return out
 
 
-# ── Pekerjaan (satu per satu) ───────────────────────────────────────────────
-class Kerja:
-    def __init__(self):
-        self.kunci = threading.Lock()
-        self.id = 0
-        self.jenis = ""
-        self.log: list[str] = []
-        self.status = "siap"  # siap | jalan | selesai | gagal
-        self.folder: Path | None = None
-        self.proc: subprocess.Popen | None = None
-        self.hasil: dict = {}
-
-    def jalankan(self, jenis: str, langkah: list[tuple[list[str], Path]], folder: Path, setelah=None):
-        with self.kunci:
-            if self.status == "jalan":
-                raise RuntimeError("Masih ada proses berjalan. Tunggu selesai atau batalkan.")
-            self.id += 1
-            self.jenis, self.log, self.status, self.folder, self.hasil = jenis, [], "jalan", folder, {}
-        threading.Thread(target=self._kerja, args=(langkah, setelah), daemon=True).start()
-
-    def _kerja(self, langkah, setelah):
-        env = os.environ.copy()
-        p = baca_pengaturan()
-        env.update({k: v for k, v in p.items() if v})
-        env["UV"] = cari_uv()
-        if p.get("VOXCPM_MODE") == "clone" and ref_suara():
-            env["VOXCPM_REFERENSI"] = str(ref_suara())
-        if p.get("VOXCPM_MODE") != "desain":
-            env.pop("VOXCPM_DESAIN", None)
-        env["PYTHONUNBUFFERED"] = "1"
-        env["PYTHONIOENCODING"] = "utf-8"  # Windows: cegah galat cp1252 saat mencetak “ ” dan emoji
-        try:
-            for cmd, cwd in langkah:
-                self.log.append("$ " + " ".join(Path(c).name if i < 2 else c for i, c in enumerate(cmd)))
-                self.proc = subprocess.Popen(cmd, cwd=cwd, env=env, stdout=subprocess.PIPE,
-                                             stderr=subprocess.STDOUT, text=True, bufsize=1,
-                                             encoding="utf-8", errors="replace",
-                                             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-                for baris in self.proc.stdout:
-                    baris = baris.rstrip()
-                    if baris and not re.search(r"objc\[|AVFAudioReceiver|Warning|warn\(|^\s*$", baris):
-                        self.log.append(baris)
-                        self.log[:] = self.log[-400:]
-                if self.proc.wait() != 0:
-                    self.status = "gagal" if self.status != "batal" else "batal"
-                    return
-            if setelah:
-                setelah(self)
-            self.status = "selesai"
-        except Exception as e:  # noqa: BLE001
-            self.log.append(f"Galat: {e}")
-            self.status = "gagal"
-        finally:
-            self.proc = None
-
-    def batal(self):
-        if self.proc:
-            self.status = "batal"
-            self.proc.terminate()
-
-    def ringkas(self) -> dict:
-        return {"id": self.id, "jenis": self.jenis, "status": self.status, "log": self.log[-200:],
-                "hasil": self.hasil}
+# ── Pekerjaan: antrean beberapa jalur (lihat antrean.py) ───────────────────
+def lingkungan_kerja() -> dict:
+    env = os.environ.copy()
+    p = baca_pengaturan()
+    env.update({k: v for k, v in p.items() if v})
+    env["UV"] = cari_uv()
+    if p.get("VOXCPM_MODE") == "clone" and ref_suara():
+        env["VOXCPM_REFERENSI"] = str(ref_suara())
+    if p.get("VOXCPM_MODE") != "desain":
+        env.pop("VOXCPM_DESAIN", None)
+    env["PYTHONUNBUFFERED"] = "1"
+    env["PYTHONIOENCODING"] = "utf-8"  # Windows: cegah galat cp1252 saat mencetak “ ” dan emoji
+    return env
 
 
-KERJA = Kerja()
+KERJA = Kerja(lingkungan_kerja)         # jalur "utama": analisis, render, motion, pemasangan
+KERJA_UNGGAH = Kerja(lingkungan_kerja)  # jalur "unggah": posting ke media sosial, berjalan paralel dengan render
 
 
 # Versi installer (.dmg/.exe): Python + semua paket sudah dibundel, peluncur mengisi STUDIO_PY.
@@ -190,9 +143,11 @@ def cari_node() -> str:
 
 
 def proyek_baru(jenis: str) -> Path:
-    if KERJA.status == "jalan":  # jangan tinggalkan folder kosong kalau ditolak
-        raise RuntimeError("Masih ada proses berjalan. Tunggu selesai atau batalkan dulu.")
     f = DATA / jenis / time.strftime("%Y%m%d-%H%M%S")
+    n = 2
+    while f.exists():  # dua tugas dalam detik yang sama
+        f = DATA / jenis / (time.strftime("%Y%m%d-%H%M%S") + f"-{n}")
+        n += 1
     f.mkdir(parents=True, exist_ok=True)
     return f
 
@@ -405,11 +360,9 @@ def mulai_klip(d: dict) -> dict:
         cmd += ["--subtitle-file", d["subtitle_file"]]
     (folder / "permintaan.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
 
-    def setelah(k: Kerja):
-        k.hasil = muat_proyek("klip", folder.name)
-
-    KERJA.jalankan("klip", [(cmd, KLIP)], folder, setelah)
-    return {"proyek": folder.name}
+    t = ANTREAN.tambah("utama", "klip", [(cmd, KLIP)], folder, ("muat_proyek", {"jenis": "klip", "nama": folder.name}),
+                       label=f"Analisis: {Path(sumber).name if not sumber.startswith('http') else sumber}"[:120])
+    return {"proyek": folder.name, **t}
 
 
 def _folder_klip(nama: str) -> Path:
@@ -488,11 +441,9 @@ def mulai_render_klip(d: dict) -> dict:
     cmd = [*jalankan_skrip(KLIP / "klip.py"), "--render", "--keluar", str(folder),
            "--pilih", ",".join(map(str, pilih)), "--gaya", str(folder / "gaya-permintaan.json")]
 
-    def setelah(k: Kerja):
-        k.hasil = muat_proyek("klip", nama)
-
-    KERJA.jalankan("render", [(cmd, KLIP)], folder, setelah)
-    return {"proyek": nama}
+    t = ANTREAN.tambah("utama", "render", [(cmd, KLIP)], folder, ("muat_proyek", {"jenis": "klip", "nama": nama}),
+                       label=f"Render {len(pilih)} klip · {nama}")
+    return {"proyek": nama, **t}
 
 
 def mulai_motion(d: dict) -> dict:
@@ -534,16 +485,9 @@ def mulai_motion(d: dict) -> dict:
         perintah.append("--suara=voxcpm")
     langkah.append((perintah, MOTION))
 
-    def setelah(k: Kerja):
-        for f in (MOTION / "hasil").glob(f"{nama}-*.mp4"):
-            shutil.move(str(f), folder / "video.mp4")
-        n = MOTION / "naskah" / f"{nama}.json"
-        if n.exists():
-            shutil.copy(n, folder / "naskah.json")
-        k.hasil = muat_proyek("motion", nama)
-
-    KERJA.jalankan("motion", langkah, folder, setelah)
-    return {"proyek": nama}
+    t = ANTREAN.tambah("utama", "motion", langkah, folder, ("motion_selesai", {"nama": nama}),
+                       label=f"Motion: {topik or 'naskah sendiri'}"[:120])
+    return {"proyek": nama, **t}
 
 
 def muat_proyek(jenis: str, nama: str) -> dict:
@@ -663,23 +607,55 @@ def mulai_unggah(d: dict) -> dict:
     cmd = [*jalankan_skrip(AKAR / "unggah.py"), "--data", str(DATA), "--berkas", str(berkas),
            "--meta", str(f_meta), "--hasil", str(f_hasil)]
 
-    def setelah(k: Kerja):
-        if not f_hasil.exists():
-            return
-        hasil = json.loads(f_hasil.read_text(encoding="utf-8"))
-        hasil.update(proyek=nama, no=no, sumber_izin=meta["sumber_izin"])
-        semua = json.loads((folder / "klip.json").read_text(encoding="utf-8"))
-        for x in semua:
-            if x.get("no") == no:
-                x.setdefault("unggahan", []).append(hasil)
-        (folder / "klip.json").write_text(json.dumps(semua, ensure_ascii=False, indent=2), encoding="utf-8")
-        RIWAYAT_UNGGAH.parent.mkdir(parents=True, exist_ok=True)
-        with open(RIWAYAT_UNGGAH, "a", encoding="utf-8") as fh:  # log jejak: apa, ke mana, kapan, atas izin apa
-            fh.write(json.dumps(hasil, ensure_ascii=False) + "\n")
-        k.hasil = muat_proyek("klip", nama)
+    t = ANTREAN.tambah("unggah", "unggah", [(cmd, AKAR)], folder,
+                       ("unggah_selesai", {"nama": nama, "no": no, "f_hasil": str(f_hasil), "sumber_izin": meta["sumber_izin"]}),
+                       label=f"YouTube: {meta['judul']}"[:120], platform="youtube", info={"proyek": nama, "no": no})
+    return {"proyek": nama, **t}
 
-    KERJA.jalankan("unggah", [(cmd, AKAR)], folder, setelah)
-    return {"proyek": nama}
+
+def _setelah_muat(k: Kerja, jenis: str, nama: str):
+    k.hasil = muat_proyek(jenis, nama)
+
+
+def _setelah_motion(k: Kerja, nama: str):
+    folder = DATA / "motion" / nama
+    for f in (MOTION / "hasil").glob(f"{nama}-*.mp4"):
+        shutil.move(str(f), folder / "video.mp4")
+    n = MOTION / "naskah" / f"{nama}.json"
+    if n.exists():
+        shutil.copy(n, folder / "naskah.json")
+    k.hasil = muat_proyek("motion", nama)
+
+
+def _setelah_unggah(k: Kerja, nama: str, no: int, f_hasil: str, sumber_izin: str = ""):
+    f_hasil = Path(f_hasil)
+    folder = DATA / "klip" / nama
+    if not f_hasil.exists():
+        return
+    hasil = json.loads(f_hasil.read_text(encoding="utf-8"))
+    hasil.update(proyek=nama, no=no, sumber_izin=sumber_izin)
+    semua = json.loads((folder / "klip.json").read_text(encoding="utf-8"))
+    for x in semua:
+        if x.get("no") == no:
+            x.setdefault("unggahan", []).append(hasil)
+    (folder / "klip.json").write_text(json.dumps(semua, ensure_ascii=False, indent=2), encoding="utf-8")
+    RIWAYAT_UNGGAH.parent.mkdir(parents=True, exist_ok=True)
+    with open(RIWAYAT_UNGGAH, "a", encoding="utf-8") as fh:  # log jejak: apa, ke mana, kapan, atas izin apa
+        fh.write(json.dumps(hasil, ensure_ascii=False) + "\n")
+    k.hasil = {"unggah": hasil}
+
+
+def jeda_platform(platform: str) -> int:
+    """Jeda minimum antar-posting per platform (detik), dari Pengaturan. Bawaan 30 menit."""
+    try:
+        return int(float(baca_pengaturan().get("JEDA_POSTING_MENIT") or 30) * 60)
+    except ValueError:
+        return 1800
+
+
+ANTREAN = Antrean(DATA / "antrean.json", {"utama": KERJA, "unggah": KERJA_UNGGAH},
+                  {"muat_proyek": _setelah_muat, "motion_selesai": _setelah_motion, "unggah_selesai": _setelah_unggah},
+                  jeda_platform)
 
 
 # ── HTTP ────────────────────────────────────────────────────────────────────
@@ -778,6 +754,8 @@ class H(BaseHTTPRequestHandler):
                 return self._json(status_ai())
             if jalur == "/api/proyek":
                 return self._json(daftar_proyek())
+            if jalur == "/api/antrean":
+                return self._json(ANTREAN.daftar())
             if jalur == "/api/akun-unggah":
                 return self._json({"youtube": UNGGAH.status(DATA)})
             if m := re.match(r"^/api/jejak/([\w-]+)/(\d+)$", jalur):
@@ -873,6 +851,10 @@ class H(BaseHTTPRequestHandler):
             if jalur == "/api/youtube-putus":
                 UNGGAH.hapus_token(DATA)
                 return self._json({"youtube": UNGGAH.status(DATA)})
+            if jalur == "/api/antrean-batal":
+                return self._json({"ok": ANTREAN.batal(str(d.get("id", "")))})
+            if jalur == "/api/antrean-ulang":
+                return self._json(ANTREAN.ulangi(str(d.get("id", ""))))
             if jalur == "/api/unggah-klip":
                 return self._json(mulai_unggah(d))
             if jalur == "/api/hapus-proyek":
@@ -894,6 +876,7 @@ class H(BaseHTTPRequestHandler):
                 return self._json({"jalur": str(tujuan)})
             if jalur == "/api/matikan":
                 KERJA.batal()
+                KERJA_UNGGAH.batal()
                 threading.Timer(0.3, lambda: os._exit(0)).start()
                 return self._json({"ok": True})
             if jalur == "/api/batal":
@@ -947,6 +930,7 @@ def server_hidup(url: str) -> bool:
 def main():
     global PORT
     DATA.mkdir(parents=True, exist_ok=True)
+    ANTREAN.mulai()
     # Port 8787 bisa dipakai aplikasi lain (mis. server pengembangan). Cari Studio yang sudah jalan,
     # kalau tidak ada, pakai port kosong pertama dari 8787–8806.
     sudah, srv = False, None
@@ -1041,6 +1025,7 @@ def main():
                           background_color="#07090F", js_api=Jembatan())
     webview.start(setelah_mulai)
     KERJA.batal()
+    KERJA_UNGGAH.batal()
     os._exit(0)
 
 
