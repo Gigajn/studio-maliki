@@ -32,6 +32,7 @@ import unggah as UNGGAH  # noqa: E402  (pustaka standar saja)
 from antrean import Antrean, Kerja  # noqa: E402
 import caption as CAPTION  # noqa: E402
 import live as LIVE  # noqa: E402
+import statistik as STATISTIK  # noqa: E402
 import unggah_instagram as IG  # noqa: E402
 import unggah_tiktok as TT  # noqa: E402
 
@@ -743,6 +744,7 @@ def jalankan_rekam(k: dict, folder: Path) -> subprocess.Popen:
                             stderr=subprocess.STDOUT, **kw)
 
 
+PELACAK = STATISTIK.Pelacak(DATA, {"youtube": UNGGAH, "tiktok": TT, "instagram": IG}, lambda: CAPTION.daftar_kampanye(DATA))
 PEMANTAU = LIVE.Pemantau(DATA, jalankan_rekam, token_youtube=lambda: UNGGAH.token_segar(DATA))
 
 
@@ -868,6 +870,8 @@ class H(BaseHTTPRequestHandler):
                 return self._json(ANTREAN.daftar())
             if jalur == "/api/akun-unggah":
                 return self._json(status_akun())
+            if jalur == "/api/statistik":
+                return self._json(PELACAK.ringkasan())
             if jalur == "/api/live":
                 return self._json(PEMANTAU.ringkas())
             if m := re.match(r"^/berkas/live/([\w-]+)/([\w-]+)/(kandidat-\d+\.mp4)$", jalur):
@@ -989,6 +993,14 @@ class H(BaseHTTPRequestHandler):
                 return self._json(ANTREAN.ulangi(str(d.get("id", ""))))
             if jalur == "/api/unggah-klip":
                 return self._json(mulai_unggah(d))
+            if jalur == "/api/statistik-segarkan":
+                return self._json(PELACAK.segarkan())
+            if jalur == "/api/statistik-tautkan":
+                PELACAK.tautkan(str(d.get("platform", "")), str(d.get("id", "")), str(d.get("url", "")))
+                return self._json(PELACAK.ringkasan())
+            if jalur == "/api/statistik-manual":
+                PELACAK.isi_manual(str(d.get("platform", "")), str(d.get("id", "")), d.get("views"))
+                return self._json(PELACAK.ringkasan())
             if jalur == "/api/live-kunci":
                 return self._json(PEMANTAU.simpan_kunci(d))
             if jalur == "/api/live-kanal":
@@ -1084,6 +1096,7 @@ def main():
     DATA.mkdir(parents=True, exist_ok=True)
     ANTREAN.mulai()
     PEMANTAU.mulai()
+    PELACAK.mulai()
     # Port 8787 bisa dipakai aplikasi lain (mis. server pengembangan). Cari Studio yang sudah jalan,
     # kalau tidak ada, pakai port kosong pertama dari 8787–8806.
     sudah, srv = False, None

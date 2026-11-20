@@ -479,6 +479,7 @@ main{position:relative;z-index:1}
     <div class="label-kecil">Pustaka</div>
     <button class="nav" data-ke="kampanye"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>Kampanye</button>
     <button class="nav" data-ke="live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8a6 6 0 0 1 0 8.4M7.8 16.2a6 6 0 0 1 0-8.4M19 5a10 10 0 0 1 0 14M5 19A10 10 0 0 1 5 5"/></svg>Live <span class="lencana" id="nLive" hidden style="margin-left:auto;padding:1px 7px;background:#e5484d;color:#fff">0</span></button>
+    <button class="nav" data-ke="statistik"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg>Statistik</button>
     <button class="nav" data-ke="antrean"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/></svg>Antrean <span class="lencana" id="nAntrean" hidden style="margin-left:auto;padding:1px 7px">0</span></button>
     <button class="nav" data-ke="riwayat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>Riwayat</button>
     <button class="nav" data-ke="pengaturan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>Pengaturan AI</button>
@@ -738,8 +739,8 @@ main{position:relative;z-index:1}
             <div class="aksi"><button class="tombol utama" id="lvSimpan">Simpan kanal</button></div>
           </div>
           <details class="kartu akun"><summary><b>Kunci API</b> <span id="lvStatusKunci" style="color:var(--redup);font-size:13px"></span></summary>
-            <p style="color:var(--redup);font-size:13px">Twitch: buat aplikasi di <a href="#" data-buka="https://dev.twitch.tv/console/apps">dev.twitch.tv</a>.
-              Kick: buat aplikasi di <a href="#" data-buka="https://kick.com/settings/developer">kick.com</a>. YouTube: pakai akun yang sudah tersambung di Pengaturan, atau API key.
+            <p style="color:var(--redup);font-size:13px">Twitch: buat aplikasi di <a href="#" data-tautan="https://dev.twitch.tv/console/apps">dev.twitch.tv</a>.
+              Kick: buat aplikasi di <a href="#" data-tautan="https://kick.com/settings/developer">kick.com</a>. YouTube: pakai akun yang sudah tersambung di Pengaturan, atau API key.
               Kunci hanya disimpan di laptop ini.</p>
             <div class="grid2" style="gap:10px"><div class="bidang"><label>Twitch Client ID</label><input class="input" id="lvTwId"></div>
               <div class="bidang"><label>Twitch Client Secret</label><input class="input" id="lvTwRahasia" type="password"></div>
@@ -753,6 +754,17 @@ main{position:relative;z-index:1}
       </div>
       <h2 class="judul-kartu" style="margin-top:18px"><i></i>kandidat momen</h2>
       <div id="daftarKandidat" class="grid-kandidat"></div>
+    </section>
+
+    <section class="halaman" id="h-statistik">
+      <div class="kepala"><div><div class="eyebrow">views per klip · estimasi pendapatan</div><h1>Statistik</h1>
+        <p>Angka diambil dari API resmi tiap platform, otomatis tiap 6 jam. Estimasi = views ÷ 1.000 × tarif kampanye.
+          Ini hanya perkiraan: bayaran resmi tetap mengikuti dasbor kampanye (minimum views, batas bayar, verifikasi).</p></div>
+        <button class="tombol kedua" id="stSegarkan">Perbarui sekarang</button></div>
+      <div class="ringkas" id="stTotal"></div>
+      <div id="stGalat"></div>
+      <div id="stKampanye"></div>
+      <div id="stDaftar"></div>
     </section>
 
     <section class="halaman" id="h-antrean">
@@ -1067,7 +1079,7 @@ $('#wizLanjut').onclick = () => { if (WIZ.langkah === 4) return tutupWizard(); W
 $('#wizKembali').onclick = () => { WIZ.langkah = Math.max(1, WIZ.langkah - 1); gambarWizard(); };
 $$('[data-wiz-ke]').forEach((k) => k.onclick = () => tutupWizard(k.dataset.wizKe));
 $('#bukaWizard').onclick = () => bukaWizard();
-function ke(h) { $$('.nav').forEach((n) => n.classList.toggle('aktif', n.dataset.ke === h)); $$('.halaman').forEach((x) => x.classList.toggle('aktif', x.id === 'h-' + h)); if (h === 'beranda') muatBeranda(); if (h === 'antrean') muatAntrean(); if (h === 'kampanye') muatKampanye(); if (h === 'live') muatLive();
+function ke(h) { $$('.nav').forEach((n) => n.classList.toggle('aktif', n.dataset.ke === h)); $$('.halaman').forEach((x) => x.classList.toggle('aktif', x.id === 'h-' + h)); if (h === 'beranda') muatBeranda(); if (h === 'antrean') muatAntrean(); if (h === 'kampanye') muatKampanye(); if (h === 'live') muatLive(); if (h === 'statistik') muatStatistik();
   if (h === 'pengaturan') muatStatusAI();
   if (h === 'riwayat') { muatRiwayat(); $('#cariRiwayat').oninput = muatRiwayat; } if (h === 'pengaturan') muatPengaturan(); }
 $$('.nav').forEach((n) => n.onclick = () => ke(n.dataset.ke));
@@ -1574,7 +1586,7 @@ $('#kmSimpan').onclick = async () => {
 const NAMA_LIVE = {twitch: 'Twitch', youtube: 'YouTube', kick: 'Kick'};
 const PETUNJUK_LIVE = {twitch: 'nama login, mis. namastreamer', youtube: 'ID kanal (UC…) atau @handle', kick: 'slug kanal, mis. namastreamer'};
 $$('#lvPlatform button').forEach((b) => b.onclick = () => { $$('#lvPlatform button').forEach((x) => x.classList.toggle('aktif', x === b)); $('#lvPetunjuk').textContent = PETUNJUK_LIVE[b.dataset.v]; });
-$$('[data-buka]').forEach((a) => a.onclick = (e) => { e.preventDefault(); buka(a.dataset.buka); });
+$$('[data-tautan]').forEach((a) => a.onclick = (e) => { e.preventDefault(); buka(a.dataset.tautan); });
 let LIVE = null;
 async function muatLive(diam) {
   let d; try { d = await api('/api/live'); } catch { return; }
@@ -1631,6 +1643,48 @@ $('#lvSimpanKunci').onclick = async () => {
   } catch (e) { toast(e.message, true); }
 };
 setInterval(() => muatLive(true), 15000); setTimeout(() => muatLive(true), 800);
+
+// ── Halaman Statistik ──
+const NAMA_PLATFORM_ST = {youtube: 'YouTube', tiktok: 'TikTok', instagram: 'Instagram'};
+const angka = (n) => Number(n || 0).toLocaleString('id-ID');
+const uang = (n, u) => `${esc(u || '')} ${Number(n || 0).toLocaleString('id-ID', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+function garisMini(r) {
+  if (!r || r.length < 2) return '';
+  const v = r.map((t) => t[1]), maks = Math.max(...v, 1), w = 90, h = 24;
+  const titik = v.map((x, i) => `${(i / (v.length - 1) * w).toFixed(1)},${(h - x / maks * (h - 2) - 1).toFixed(1)}`).join(' ');
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-label="tren views"><polyline points="${titik}" fill="none" stroke="var(--aksen)" stroke-width="1.5"/></svg>`;
+}
+async function muatStatistik(d) {
+  if (!d) { try { d = await api('/api/statistik'); } catch { return; } }
+  const t = d.total;
+  $('#stTotal').innerHTML = `<span class="stat">Unggahan <b>${angka(t.unggahan)}</b></span><span class="stat">Total views <b>${angka(t.views)}</b></span>`
+    + Object.entries(t.pendapatan).map(([u, n]) => `<span class="stat">Estimasi <b>${uang(n, u)}</b></span>`).join('')
+    + `<span class="stat">Diperbarui <b>${d.terakhir ? waktuLokal(d.terakhir) : 'belum'}</b></span>`;
+  $('#stGalat').innerHTML = Object.entries(d.galat || {}).map(([p, g]) => `<div class="kartu" style="margin-bottom:10px;border-color:#e5484d"><b>${esc(NAMA_PLATFORM_ST[p] || p)}:</b> ${esc(g)}</div>`).join('');
+  $('#stKampanye').innerHTML = d.kampanye.length ? `<div class="kartu" style="margin-bottom:14px"><h2 class="judul-kartu"><i></i>per kampanye</h2>
+    <table class="tabel-syarat" style="width:100%"><thead><tr><th>kampanye</th><th>unggahan</th><th>views</th><th>tarif / 1.000</th><th>estimasi</th></tr></thead><tbody>
+    ${d.kampanye.map((k) => `<tr><td>${esc(k.nama)}</td><td>${k.unggahan}</td><td>${angka(k.views)}</td><td>${uang(k.tarif_per_1000, k.mata_uang)}</td><td><b>${uang(k.estimasi, k.mata_uang)}</b></td></tr>`).join('')}
+    </tbody></table></div>` : '';
+  $('#stDaftar').innerHTML = d.unggahan.length ? d.unggahan.map((u) => `<div class="kartu" style="margin-bottom:10px">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <span class="lencana">${esc(NAMA_PLATFORM_ST[u.platform] || u.platform)}</span>
+        <b style="flex:1;min-width:180px">${esc(u.judul || u.id)}</b>
+        ${garisMini(u.riwayat)}
+        <span class="stat">👁 <b>${angka(u.views)}</b>${u.manual ? ' (manual)' : ''}</span>
+        <span class="stat">❤ ${angka(u.suka)} · 💬 ${angka(u.komentar)}</span>
+        ${u.estimasi ? `<span class="stat">≈ <b>${uang(u.estimasi, u.mata_uang)}</b></span>` : ''}
+        ${u.url ? `<button class="tombol kedua kecil" data-sturl="${esc(u.url)}">Buka</button>` : ''}</div>
+      <small style="color:var(--redup)">${esc(u.kampanye ? 'Kampanye ' + u.kampanye + ' · ' : '')}${esc((u.waktu || '').slice(0, 16).replace('T', ' '))}</small>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+        ${u.perlu_tautan ? `<input class="input" style="flex:1;min-width:220px" placeholder="Draf TikTok: tempel link video setelah kamu posting" data-sttaut="${esc(u.id)}">` : ''}
+        <input class="input" style="width:170px" type="number" min="0" placeholder="isi views manual" value="${u.manual ? u.views : ''}" data-stmanual="${esc(u.id)}" data-platform="${esc(u.platform)}">
+      </div></div>`).join('')
+    : '<div class="kartu kosong"><b>Belum ada unggahan</b>Klip yang kamu unggah lewat Studio akan muncul di sini beserta views-nya.</div>';
+  $$('[data-sturl]').forEach((b) => b.onclick = () => buka(b.dataset.sturl));
+  $$('[data-sttaut]').forEach((i) => i.onchange = async () => { try { muatStatistik(await api('/api/statistik-tautkan', {platform: 'tiktok', id: i.dataset.sttaut, url: i.value})); toast('Ditautkan ✓ Klik "Perbarui sekarang" untuk ambil views.'); } catch (e) { toast(e.message, true); } });
+  $$('[data-stmanual]').forEach((i) => i.onchange = async () => { try { muatStatistik(await api('/api/statistik-manual', {platform: i.dataset.platform, id: i.dataset.stmanual, views: i.value})); } catch (e) { toast(e.message, true); } });
+}
+$('#stSegarkan').onclick = async () => { $('#stSegarkan').disabled = true; try { muatStatistik(await api('/api/statistik-segarkan', {})); toast('Statistik diperbarui ✓'); } catch (e) { toast(e.message, true); } $('#stSegarkan').disabled = false; };
 
 // ── Halaman Antrean ──
 const LABEL_STATUS = {menunggu: '⏳ menunggu', jalan: '▶ berjalan', selesai: '✓ selesai', gagal: '✕ gagal', batal: '⊘ dibatalkan'};
