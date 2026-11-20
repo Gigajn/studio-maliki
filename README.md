@@ -87,6 +87,38 @@ uv run studio/studio.py            # jendela aplikasi
 uv run studio/studio.py --browser  # atau buka di browser
 ```
 
+## Unggah ke YouTube Shorts, TikTok, dan Instagram Reels (API resmi)
+Klip yang sudah dirender bisa diunggah dari kartunya (**Unggah…**) ke satu atau beberapa platform sekaligus. Setiap unggahan selalu lewat
+layar review: caption per platform (otomatis mengikuti batas karakter dan aturan kampanye), privasi, sampul, jadwal, keterangan izin konten,
+dan centang "saya berhak mengunggah". Tanpa centang itu, Studio menolak. Unggahan masuk **Antrean** dengan jeda minimum antar-posting
+per platform (bawaan 30 menit, atur di Pengaturan).
+- **YouTube**: OAuth client *Desktop app* dari proyek Google Cloud milikmu (aktifkan YouTube Data API v3). Izin: `youtube.upload` dan
+  `youtube.readonly` (untuk statistik). Kuota gratis 10.000 unit/hari; satu unggahan ±1.600 unit (±6 video/hari). Proyek yang belum
+  diaudit Google hanya bisa mengunggah sebagai privat. Shorts tidak menerima sampul lewat API.
+- **TikTok**: aplikasi Login Kit for Desktop + Content Posting API di developers.tiktok.com (redirect `http://127.0.0.1:<port>/oauth/tiktok`).
+  Mode **draf** mengirim ke kotak masuk TikTok; mode **posting langsung** wajib memilih privasi (tidak ada bawaan) dan butuh aplikasi yang
+  sudah diaudit TikTok untuk tayang publik.
+- **Instagram Reels**: akun Instagram profesional (Bisnis/Kreator), aplikasi Meta dengan *Instagram API with Instagram Login*.
+  Tempel token akses di Pengaturan; token diperpanjang otomatis. Batas 100 posting API per 24 jam.
+- Token disimpan di `~/Studio Maliki/.rahasia/` (izin 600; di Windows dibatasi ke akunmu). Setiap unggahan dicatat di
+  `~/Studio Maliki/unggah/riwayat.jsonl` beserta sumber izinnya.
+- Unggah hanya konten milikmu, dari program clipper/kampanye yang memberi izin, atau dengan izin tertulis pemiliknya.
+
+## Kampanye clipper dan statistik
+- **Kampanye**: simpan aturan tiap kampanye yang kamu ikuti (platform, hashtag/mention/teks wajib, durasi, tarif per 1.000 views,
+  link bukti izin). Caption otomatis memuat aturannya dan Studio memberi peringatan bila durasi atau platform tidak sesuai.
+- **Statistik**: views, suka, dan komentar tiap unggahan diambil dari API resmi tiap 6 jam, lengkap dengan estimasi pendapatan per
+  kampanye (views ÷ 1.000 × tarif). Ini perkiraan; bayaran resmi tetap mengikuti dasbor kampanye. Draf TikTok bisa ditautkan ke video
+  yang sudah kamu posting; kampanye yang menghitung sendiri bisa diisi views manual.
+
+## Live: pantau, rekam, potong momen
+Halaman **Live** mengecek kanal Twitch, YouTube, dan Kick tiap 2 menit lewat API resmi (Twitch Helix, Kick Public API, RSS + Data API
+YouTube). Isi Client ID/secret aplikasi Twitch dan Kick milikmu; YouTube memakai akun yang sudah tersambung atau API key.
+- Kanal dengan **bukti izin** (program clipper resmi atau izin tertulis) bisa direkam otomatis saat live. Tanpa bukti izin, kanal hanya dipantau.
+- Perekam (`klip/rekam_live.py`) menyimpan siaran per 60 detik tanpa encode ulang, mencari lonjakan chat (Twitch, dibaca anonim) dan
+  lonjakan suara, lalu memotong kandidat 45 detik di sekitar momen. Potongan lama dihapus otomatis (buffer 15 menit).
+- Kandidat **tidak pernah diunggah otomatis**: klik **Proses jadi klip** untuk analisis dan render seperti biasa, lalu review dan unggah.
+
 ## Bingkai mengikuti pembicara
 Pada fokus **Otomatis (wajah)**, Klip mendeteksi pergantian kamera di dalam klip, mencari wajah (depan dan samping) per adegan, lalu menggeser
 bingkai 9:16 mengikuti pembicara. Cocok untuk podcast multi-kamera.

@@ -17,8 +17,8 @@ jobs:
       ATEN_CPU_CAPABILITY: avx2
       ONEDNN_MAX_CPU_ISA: AVX2
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
       - name: Pasang & cek model
         shell: pwsh
         run: uv run -q suara\suara.py --cek 2>&1 | Tee-Object cek.txt
@@ -34,7 +34,7 @@ jobs:
           uv run -q suara\suara.py --daftar daftar.json --folder keluar 2>&1 | Tee-Object buat.txt
           Write-Host "exit=$LASTEXITCODE"
           if ($LASTEXITCODE -ne 0) { exit 1 }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           name: hasil-voxcpm-${{ matrix.dtype }}

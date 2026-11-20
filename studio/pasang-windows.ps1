@@ -12,7 +12,7 @@ Write-Host ""
 # 1) uv — pengelola Python resmi dari Astral (astral.sh/uv)
 if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
   Write-Host "- Memasang uv..."
-  powershell -ExecutionPolicy ByPass -NoProfile -Command "irm https://astral.sh/uv/install.ps1 | iex"
+  powershell -ExecutionPolicy ByPass -NoProfile -Command "irm https://astral.sh/uv/0.11.32/install.ps1 | iex"
   $env:Path = "$env:USERPROFILE\.local\bin;$env:Path"
 }
 Write-Host "- uv siap: $(uv --version)"

@@ -11,6 +11,7 @@ Jalankan: uv run studio.py            → jendela aplikasi (native)
 """
 from __future__ import annotations
 
+import html
 import json
 import mimetypes
 import os
@@ -23,9 +24,18 @@ import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 AKAR = Path(__file__).resolve().parent
+sys.path.insert(0, str(AKAR))
+import unggah as UNGGAH  # noqa: E402  (pustaka standar saja)
+from antrean import Antrean, Kerja  # noqa: E402
+import caption as CAPTION  # noqa: E402
+import live as LIVE  # noqa: E402
+import statistik as STATISTIK  # noqa: E402
+import unggah_instagram as IG  # noqa: E402
+import unggah_tiktok as TT  # noqa: E402
+
 ALAT = AKAR.parent
 KLIP = ALAT / "klip"
 if not os.environ.get("STUDIO_PY") and (ALAT / "BUNDEL").exists():
@@ -56,7 +66,8 @@ DATA = Path(os.environ.get("STUDIO_DATA", Path.home() / "Studio Maliki"))
 ENV = DATA / "pengaturan.env"
 PORT = int(os.environ.get("STUDIO_PORT", "8787"))
 KUNCI = ["SUARA", "VOXCPM_MODE", "VOXCPM_DESAIN", "AI", "LANGGANAN", "OPENCODE_MODEL", "CLAUDE_CODE_MODEL", "CODEX_MODEL", "GEMINI_API_KEY", "GEMINI_MODEL",
-         "OPENAI_BASE_URL", "OPENAI_API_KEY", "OPENAI_MODEL", "SUARA_MAC", "TEMA", "PIXABAY_API_KEY"]
+         "OPENAI_BASE_URL", "OPENAI_API_KEY", "OPENAI_MODEL", "SUARA_MAC", "TEMA", "PIXABAY_API_KEY",
+         "JEDA_POSTING_MENIT", "KLIP_COOKIES_BROWSER"]
 BAWAAN = {"SUARA": "bawaan", "VOXCPM_MODE": "bawaan", "AI": "lokal", "LANGGANAN": "claude-code", "GEMINI_MODEL": "gemini-3.8-flash",
           "OPENAI_BASE_URL": "http://localhost:11434/v1", "OPENAI_MODEL": "gemma3:4b", "SUARA_MAC": "Damayanti"}
 
@@ -72,15 +83,41 @@ def baca_pengaturan() -> dict:
     return p
 
 
+def url_ai_aman(url: str) -> bool:
+    """Kunci API hanya boleh dikirim lewat https, kecuali ke server di laptop/jaringan rumah sendiri (Ollama, LM Studio)."""
+    import ipaddress
+    u = urlparse(url)
+    if u.scheme == "https" and u.hostname:
+        return True
+    host = u.hostname or ""
+    if u.scheme != "http" or not host:
+        return False
+    if host == "localhost" or host.endswith(".local"):
+        return True
+    try:
+        return ipaddress.ip_address(host).is_private or ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
 def simpan_pengaturan(baru: dict) -> None:
     p = baca_pengaturan()
     for k in KUNCI:
         if k in baru and baru[k] is not None:
-            p[k] = str(baru[k]).strip()
+            v = str(baru[k]).strip()
+            if re.search(r"[\r\n\x00]", v):  # satu baris per kunci: cegah menyisipkan kunci lain ke file .env
+                raise ValueError(f"Isian {k} tidak boleh berisi baris baru.")
+            p[k] = v
+    if baru.get("OPENAI_BASE_URL") and not url_ai_aman(p["OPENAI_BASE_URL"]):
+        raise ValueError("Alamat server AI harus https:// (http hanya untuk localhost) agar kunci API tidak terkirim tanpa enkripsi.")
     DATA.mkdir(parents=True, exist_ok=True)
-    ENV.write_text("# Pengaturan Studio Maliki (berisi kunci AI — jangan dibagikan)\n" +
-                   "\n".join(f"{k}={p.get(k, '')}" for k in KUNCI) + "\n", encoding="utf-8")
-    os.chmod(ENV, 0o600)
+    tmp = ENV.with_suffix(".tmp")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write("# Pengaturan Studio Maliki (berisi kunci AI — jangan dibagikan)\n" +
+                 "\n".join(f"{k}={p.get(k, '')}" for k in KUNCI) + "\n")
+    os.replace(tmp, ENV)
+    UNGGAH.kunci_pemilik(ENV)
 
 
 def samarkan(p: dict) -> dict:
@@ -92,72 +129,23 @@ def samarkan(p: dict) -> dict:
     return out
 
 
-# ── Pekerjaan (satu per satu) ───────────────────────────────────────────────
-class Kerja:
-    def __init__(self):
-        self.kunci = threading.Lock()
-        self.id = 0
-        self.jenis = ""
-        self.log: list[str] = []
-        self.status = "siap"  # siap | jalan | selesai | gagal
-        self.folder: Path | None = None
-        self.proc: subprocess.Popen | None = None
-        self.hasil: dict = {}
-
-    def jalankan(self, jenis: str, langkah: list[tuple[list[str], Path]], folder: Path, setelah=None):
-        with self.kunci:
-            if self.status == "jalan":
-                raise RuntimeError("Masih ada proses berjalan. Tunggu selesai atau batalkan.")
-            self.id += 1
-            self.jenis, self.log, self.status, self.folder, self.hasil = jenis, [], "jalan", folder, {}
-        threading.Thread(target=self._kerja, args=(langkah, setelah), daemon=True).start()
-
-    def _kerja(self, langkah, setelah):
-        env = os.environ.copy()
-        p = baca_pengaturan()
-        env.update({k: v for k, v in p.items() if v})
-        env["UV"] = cari_uv()
-        if p.get("VOXCPM_MODE") == "clone" and ref_suara():
-            env["VOXCPM_REFERENSI"] = str(ref_suara())
-        if p.get("VOXCPM_MODE") != "desain":
-            env.pop("VOXCPM_DESAIN", None)
-        env["PYTHONUNBUFFERED"] = "1"
-        env["PYTHONIOENCODING"] = "utf-8"  # Windows: cegah galat cp1252 saat mencetak “ ” dan emoji
-        try:
-            for cmd, cwd in langkah:
-                self.log.append("$ " + " ".join(Path(c).name if i < 2 else c for i, c in enumerate(cmd)))
-                self.proc = subprocess.Popen(cmd, cwd=cwd, env=env, stdout=subprocess.PIPE,
-                                             stderr=subprocess.STDOUT, text=True, bufsize=1,
-                                             encoding="utf-8", errors="replace",
-                                             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-                for baris in self.proc.stdout:
-                    baris = baris.rstrip()
-                    if baris and not re.search(r"objc\[|AVFAudioReceiver|Warning|warn\(|^\s*$", baris):
-                        self.log.append(baris)
-                        self.log[:] = self.log[-400:]
-                if self.proc.wait() != 0:
-                    self.status = "gagal" if self.status != "batal" else "batal"
-                    return
-            if setelah:
-                setelah(self)
-            self.status = "selesai"
-        except Exception as e:  # noqa: BLE001
-            self.log.append(f"Galat: {e}")
-            self.status = "gagal"
-        finally:
-            self.proc = None
-
-    def batal(self):
-        if self.proc:
-            self.status = "batal"
-            self.proc.terminate()
-
-    def ringkas(self) -> dict:
-        return {"id": self.id, "jenis": self.jenis, "status": self.status, "log": self.log[-200:],
-                "hasil": self.hasil}
+# ── Pekerjaan: antrean beberapa jalur (lihat antrean.py) ───────────────────
+def lingkungan_kerja() -> dict:
+    env = os.environ.copy()
+    p = baca_pengaturan()
+    env.update({k: v for k, v in p.items() if v})
+    env["UV"] = cari_uv()
+    if p.get("VOXCPM_MODE") == "clone" and ref_suara():
+        env["VOXCPM_REFERENSI"] = str(ref_suara())
+    if p.get("VOXCPM_MODE") != "desain":
+        env.pop("VOXCPM_DESAIN", None)
+    env["PYTHONUNBUFFERED"] = "1"
+    env["PYTHONIOENCODING"] = "utf-8"  # Windows: cegah galat cp1252 saat mencetak “ ” dan emoji
+    return env
 
 
-KERJA = Kerja()
+KERJA = Kerja(lingkungan_kerja)         # jalur "utama": analisis, render, motion, pemasangan
+KERJA_UNGGAH = Kerja(lingkungan_kerja)  # jalur "unggah": posting ke media sosial, berjalan paralel dengan render
 
 
 # Versi installer (.dmg/.exe): Python + semua paket sudah dibundel, peluncur mengisi STUDIO_PY.
@@ -186,9 +174,11 @@ def cari_node() -> str:
 
 
 def proyek_baru(jenis: str) -> Path:
-    if KERJA.status == "jalan":  # jangan tinggalkan folder kosong kalau ditolak
-        raise RuntimeError("Masih ada proses berjalan. Tunggu selesai atau batalkan dulu.")
     f = DATA / jenis / time.strftime("%Y%m%d-%H%M%S")
+    n = 2
+    while f.exists():  # dua tugas dalam detik yang sama
+        f = DATA / jenis / (time.strftime("%Y%m%d-%H%M%S") + f"-{n}")
+        n += 1
     f.mkdir(parents=True, exist_ok=True)
     return f
 
@@ -206,7 +196,10 @@ CLI_DIR = Path.home() / ".studio-maliki" / "cli"  # CLI dipasang di sini (tanpa 
 PAKET_CLI = {"codex": "@openai/codex", "opencode": "opencode-ai", "claude": "@anthropic-ai/claude-code"}
 PERINTAH_LOGIN = {"claude": "claude auth login", "codex": "codex login", "opencode": "opencode auth login"}
 DOMAIN_BOLEH = ("aistudio.google.com", "ollama.com", "nodejs.org", "platform.openai.com",
-                "openrouter.ai", "console.groq.com", "chatgpt.com", "claude.ai", "opencode.ai", "docs.astral.sh")
+                "openrouter.ai", "console.groq.com", "chatgpt.com", "claude.ai", "opencode.ai", "docs.astral.sh",
+                "youtube.com", "www.youtube.com", "studio.youtube.com", "console.cloud.google.com",
+                "developers.tiktok.com", "www.tiktok.com", "developers.facebook.com", "www.instagram.com",
+                "dev.twitch.tv", "www.twitch.tv", "kick.com", "docs.kick.com")
 
 
 def cari_cli(nama: str) -> str | None:
@@ -386,8 +379,10 @@ def mulai_klip(d: dict) -> dict:
     sumber = (d.get("sumber") or "").strip()
     if not sumber:
         raise ValueError("Isi link YouTube atau pilih file video dulu.")
+    if sumber.startswith("-"):  # cegah dibaca sebagai opsi baris perintah
+        raise ValueError("Sumber tidak valid. Tempel link https:// atau pilih file video.")
     folder = proyek_baru("klip")
-    cmd = [*jalankan_skrip(KLIP / "klip.py"), sumber, "--keluar", str(folder),
+    cmd = [*jalankan_skrip(KLIP / "klip.py"), "--keluar", str(folder),
            "--jumlah", str(int(d.get("jumlah", 3))), "--durasi", str(int(d.get("durasi", 30))),
            "--ai", penyedia_ai(d.get("ai")), "--model", d.get("model", "small"),
            "--warna", d.get("warna", "#FFB020")]
@@ -398,13 +393,12 @@ def mulai_klip(d: dict) -> dict:
         cmd += ["--rentang", d["rentang"]]
     if d.get("subtitle_file"):
         cmd += ["--subtitle-file", d["subtitle_file"]]
+    cmd += ["--", sumber]  # argumen posisi terakhir, setelah "--"
     (folder / "permintaan.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
 
-    def setelah(k: Kerja):
-        k.hasil = muat_proyek("klip", folder.name)
-
-    KERJA.jalankan("klip", [(cmd, KLIP)], folder, setelah)
-    return {"proyek": folder.name}
+    t = ANTREAN.tambah("utama", "klip", [(cmd, KLIP)], folder, ("muat_proyek", {"jenis": "klip", "nama": folder.name}),
+                       label=f"Analisis: {Path(sumber).name if not sumber.startswith('http') else sumber}"[:120])
+    return {"proyek": folder.name, **t}
 
 
 def _folder_klip(nama: str) -> Path:
@@ -483,11 +477,9 @@ def mulai_render_klip(d: dict) -> dict:
     cmd = [*jalankan_skrip(KLIP / "klip.py"), "--render", "--keluar", str(folder),
            "--pilih", ",".join(map(str, pilih)), "--gaya", str(folder / "gaya-permintaan.json")]
 
-    def setelah(k: Kerja):
-        k.hasil = muat_proyek("klip", nama)
-
-    KERJA.jalankan("render", [(cmd, KLIP)], folder, setelah)
-    return {"proyek": nama}
+    t = ANTREAN.tambah("utama", "render", [(cmd, KLIP)], folder, ("muat_proyek", {"jenis": "klip", "nama": nama}),
+                       label=f"Render {len(pilih)} klip · {nama}")
+    return {"proyek": nama, **t}
 
 
 def mulai_motion(d: dict) -> dict:
@@ -529,16 +521,9 @@ def mulai_motion(d: dict) -> dict:
         perintah.append("--suara=voxcpm")
     langkah.append((perintah, MOTION))
 
-    def setelah(k: Kerja):
-        for f in (MOTION / "hasil").glob(f"{nama}-*.mp4"):
-            shutil.move(str(f), folder / "video.mp4")
-        n = MOTION / "naskah" / f"{nama}.json"
-        if n.exists():
-            shutil.copy(n, folder / "naskah.json")
-        k.hasil = muat_proyek("motion", nama)
-
-    KERJA.jalankan("motion", langkah, folder, setelah)
-    return {"proyek": nama}
+    t = ANTREAN.tambah("utama", "motion", langkah, folder, ("motion_selesai", {"nama": nama}),
+                       label=f"Motion: {topik or 'naskah sendiri'}"[:120])
+    return {"proyek": nama, **t}
 
 
 def muat_proyek(jenis: str, nama: str) -> dict:
@@ -602,6 +587,218 @@ def cek_sistem() -> dict:
             "voxcpm": voxcpm_terpasang(), "referensi": ref_suara().name if ref_suara() else ""}
 
 
+# ── Unggah ke media sosial (API resmi, selalu lewat layar review) ───────────
+OAUTH_SESI: dict = {}
+RIWAYAT_UNGGAH = DATA / "unggah" / "riwayat.jsonl"
+BATAS_UNGGAH = 20 * 2**30  # 20 GB per file yang diseret ke Studio
+
+
+MODUL_PLATFORM = {"youtube": UNGGAH, "tiktok": TT, "instagram": IG}
+NAMA_PLATFORM = {"youtube": "YouTube", "tiktok": "TikTok", "instagram": "Instagram"}
+
+
+def status_akun() -> dict:
+    return {p: m.status(DATA) for p, m in MODUL_PLATFORM.items()}
+
+
+def oauth_masuk(platform: str) -> dict:
+    """Buka halaman izin resmi platform di browser bawaan (Instagram memakai token tempel, bukan OAuth lokal)."""
+    if platform not in ("youtube", "tiktok"):
+        raise ValueError("Platform ini tidak memakai login OAuth lokal.")
+    url, sesi = MODUL_PLATFORM[platform].mulai_izin(DATA, f"http://127.0.0.1:{PORT}/oauth/{platform}")
+    sesi["platform"] = platform
+    for k in [k for k, v in OAUTH_SESI.items() if v.get("platform") == platform]:
+        OAUTH_SESI.pop(k)
+    OAUTH_SESI[sesi["state"]] = sesi
+    webbrowser.open(url)
+    return {"ok": True, "url": url}
+
+
+def oauth_kembali(platform: str, q: dict) -> str:
+    def halaman(judul: str, isi: str) -> str:
+        return (f"<!doctype html><meta charset=utf-8><title>Studio Maliki</title><body style='font-family:system-ui;"
+                f"background:#07090F;color:#e2e8f0;display:grid;place-items:center;height:100vh;margin:0'>"
+                f"<div style='max-width:420px;text-align:center'><h2>{html.escape(judul)}</h2><p>{html.escape(isi)}</p></div>")
+    nama = NAMA_PLATFORM.get(platform, platform)
+    state = (q.get("state") or [""])[0]
+    sesi = OAUTH_SESI.get(state)
+    if not sesi or sesi.get("platform") != platform or time.time() - sesi["waktu"] > 600:
+        return halaman("Tautan izin tidak berlaku", f"Ulangi dari Studio: Pengaturan → Akun unggah → Sambungkan {nama}.")
+    OAUTH_SESI.pop(state, None)
+    if q.get("error"):
+        return halaman("Izin dibatalkan", f"{nama}: {(q.get('error_description') or q.get('error') or [''])[0]}")
+    try:
+        MODUL_PLATFORM[platform].tukar_kode(DATA, sesi, (q.get("code") or [""])[0])
+    except Exception as e:  # noqa: BLE001
+        return halaman(f"Gagal menyambungkan {nama}", str(e))
+    return halaman(f"{nama} tersambung ✓", "Tutup tab ini lalu kembali ke Studio Maliki.")
+
+
+def _klip_proyek(nama: str, no: int) -> tuple[Path, dict, dict]:
+    folder = DATA / "klip" / re.sub(r"[^\w-]", "", str(nama or ""))
+    if not (folder / "klip.json").exists():
+        raise ValueError("Proyek tidak ditemukan.")
+    klip = next((x for x in json.loads((folder / "klip.json").read_text(encoding="utf-8")) if x.get("no") == int(no)), None)
+    if not klip:
+        raise ValueError("Klip tidak ditemukan.")
+    info = json.loads((folder / "info.json").read_text(encoding="utf-8")) if (folder / "info.json").exists() else {}
+    return folder, klip, info
+
+
+def susun_caption(d: dict) -> dict:
+    """Judul/caption/hashtag per platform, sudah memuat aturan kampanye yang dipilih."""
+    _, klip, info = _klip_proyek(d.get("nama"), d.get("no", 0))
+    if d.get("judul"):
+        klip = {**klip, "judul_banner": str(d["judul"])[:200]}
+    kamp = CAPTION.cari_kampanye(DATA, str(d.get("kampanye") or ""))
+    return CAPTION.susun(klip, info, str(d.get("platform", "youtube")), kamp)
+
+
+def _jadwal(nilai) -> float:
+    try:
+        t = float(nilai or 0)
+    except (TypeError, ValueError):
+        raise ValueError("Jadwal tidak valid.") from None
+    if t and t < time.time() - 60:
+        raise ValueError("Jadwal sudah lewat. Pilih waktu yang akan datang.")
+    if t > time.time() + 90 * 86400:
+        raise ValueError("Jadwal maksimal 90 hari ke depan.")
+    return t
+
+
+def mulai_unggah(d: dict) -> dict:
+    """Unggah satu klip yang SUDAH direview pengguna ke satu platform. Tanpa centang izin, permintaan ditolak."""
+    platform = str(d.get("platform", "youtube"))
+    if platform not in MODUL_PLATFORM:
+        raise ValueError("Platform belum didukung.")
+    if d.get("izin") is not True:
+        raise ValueError("Centang pernyataan bahwa kamu berhak mengunggah konten ini.")
+    if not MODUL_PLATFORM[platform].status(DATA)["terhubung"]:
+        raise ValueError(f"Sambungkan akun {NAMA_PLATFORM[platform]} dulu di Pengaturan → Akun unggah.")
+    folder, klip, _ = _klip_proyek(d.get("nama"), d.get("no", 0))
+    nama, no = folder.name, int(d.get("no", 0))
+    if not klip.get("file") or not (folder / Path(klip["file"]).name).is_file():
+        raise ValueError("Klip belum dirender. Render dulu, lalu unggah.")
+    kamp = CAPTION.cari_kampanye(DATA, str(d.get("kampanye") or ""))
+    batas = CAPTION.PLATFORM[platform]
+    if platform == "youtube":
+        meta = UNGGAH.rapikan_meta(d)
+        judul_label = meta["judul"]
+    else:
+        teks = str(d.get("teks", "")).replace("\r", "")
+        if len(teks) > batas["teks"]:
+            raise ValueError(f"Caption {NAMA_PLATFORM[platform]} maksimal {batas['teks']} karakter.")
+        meta = {"teks": teks, "konten_bermerek": bool(d.get("konten_bermerek")), "promosi_sendiri": bool(d.get("promosi_sendiri"))}
+        if platform == "tiktok":
+            meta.update(mode="langsung" if d.get("mode") == "langsung" else "draf", privasi=str(d.get("privasi") or ""),
+                        tanpa_komentar=bool(d.get("tanpa_komentar")), tanpa_duet=bool(d.get("tanpa_duet")),
+                        tanpa_stitch=bool(d.get("tanpa_stitch")), durasi=float(klip.get("selesai", 0)) - float(klip.get("mulai", 0)))
+            if meta["mode"] == "langsung" and not meta["privasi"]:
+                raise ValueError("Pilih privasi TikTok dulu (tidak ada pilihan bawaan sesuai aturan TikTok).")
+        else:
+            meta["ke_feed"] = d.get("ke_feed", True) is not False
+        judul_label = (teks.splitlines() or [""])[0]
+    if d.get("cover_ms") not in (None, "") and platform != "youtube":  # Shorts tidak menerima sampul lewat API
+        durasi_ms = int((float(klip.get("selesai", 0)) - float(klip.get("mulai", 0))) * 1000)
+        meta["cover_ms"] = min(max(int(float(d["cover_ms"])), 0), max(durasi_ms - 100, 0))
+    meta["sumber_izin"] = str(d.get("sumber_izin", "") or (kamp or {}).get("sumber_izin", ""))[:300]
+    meta["kampanye"] = kamp["id"] if kamp else ""
+    jadwal = _jadwal(d.get("jadwal"))
+    berkas = folder / Path(klip["file"]).name
+    kode = f"{no:02d}-{platform}-{int(time.time() * 1000) % 10**8}"
+    f_meta, f_hasil = folder / f"unggah-{kode}.json", folder / f"unggah-{kode}-hasil.json"
+    f_meta.write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
+    cmd = [*jalankan_skrip(AKAR / "unggah.py"), "--platform", platform, "--data", str(DATA), "--berkas", str(berkas),
+           "--meta", str(f_meta), "--hasil", str(f_hasil)]
+    t = ANTREAN.tambah("unggah", "unggah", [(cmd, AKAR)], folder,
+                       ("unggah_selesai", {"nama": nama, "no": no, "f_hasil": str(f_hasil), "sumber_izin": meta["sumber_izin"],
+                                          "kampanye": meta["kampanye"]}),
+                       label=f"{NAMA_PLATFORM[platform]}: {judul_label}"[:120], platform=platform, jadwal=jadwal,
+                       info={"proyek": nama, "no": no, "platform": platform})
+    return {"proyek": nama, **t}
+
+
+def _setelah_muat(k: Kerja, jenis: str, nama: str):
+    k.hasil = muat_proyek(jenis, nama)
+
+
+def _setelah_motion(k: Kerja, nama: str):
+    folder = DATA / "motion" / nama
+    for f in (MOTION / "hasil").glob(f"{nama}-*.mp4"):
+        shutil.move(str(f), folder / "video.mp4")
+    n = MOTION / "naskah" / f"{nama}.json"
+    if n.exists():
+        shutil.copy(n, folder / "naskah.json")
+    k.hasil = muat_proyek("motion", nama)
+
+
+def _setelah_unggah(k: Kerja, nama: str, no: int, f_hasil: str, sumber_izin: str = "", kampanye: str = ""):
+    f_hasil = Path(f_hasil)
+    folder = DATA / "klip" / nama
+    if not f_hasil.exists():
+        return
+    hasil = json.loads(f_hasil.read_text(encoding="utf-8"))
+    hasil.update(proyek=nama, no=no, sumber_izin=sumber_izin, kampanye=kampanye)
+    semua = json.loads((folder / "klip.json").read_text(encoding="utf-8"))
+    for x in semua:
+        if x.get("no") == no:
+            x.setdefault("unggahan", []).append(hasil)
+    (folder / "klip.json").write_text(json.dumps(semua, ensure_ascii=False, indent=2), encoding="utf-8")
+    RIWAYAT_UNGGAH.parent.mkdir(parents=True, exist_ok=True)
+    with open(RIWAYAT_UNGGAH, "a", encoding="utf-8") as fh:  # log jejak: apa, ke mana, kapan, atas izin apa
+        fh.write(json.dumps(hasil, ensure_ascii=False) + "\n")
+    k.hasil = {"unggah": hasil}
+
+
+def jeda_platform(platform: str) -> int:
+    """Jeda minimum antar-posting per platform (detik), dari Pengaturan. Bawaan 30 menit."""
+    try:
+        return int(float(baca_pengaturan().get("JEDA_POSTING_MENIT") or 30) * 60)
+    except ValueError:
+        return 1800
+
+
+ANTREAN = Antrean(DATA / "antrean.json", {"utama": KERJA, "unggah": KERJA_UNGGAH},
+                  {"muat_proyek": _setelah_muat, "motion_selesai": _setelah_motion, "unggah_selesai": _setelah_unggah},
+                  jeda_platform)
+
+
+# ── Live: pantau kanal yang memberi izin, rekam, dan potong kandidat momen (lihat live.py) ──
+def jalankan_rekam(k: dict, folder: Path) -> subprocess.Popen:
+    if LIVE.ruang_kosong_gb(DATA) < 5:
+        raise RuntimeError("Ruang disk kurang dari 5 GB. Kosongkan dulu sebelum merekam live.")
+    cmd = [*jalankan_skrip(KLIP / "rekam_live.py"), "--url", k["url_live"], "--folder", str(folder),
+           "--platform", k["platform"], "--nama", k["nama"], "--batas-jam", str(k.get("batas_jam", 4))]
+    log = open(folder / "rekam.log", "ab")
+    kw = {"creationflags": 0x08000000} if os.name == "nt" else {}  # tanpa jendela konsol di Windows
+    return subprocess.Popen(cmd, cwd=str(KLIP), env=lingkungan_kerja(), stdin=subprocess.DEVNULL, stdout=log,
+                            stderr=subprocess.STDOUT, **kw)
+
+
+PELACAK = STATISTIK.Pelacak(DATA, {"youtube": UNGGAH, "tiktok": TT, "instagram": IG}, lambda: CAPTION.daftar_kampanye(DATA))
+PEMANTAU = LIVE.Pemantau(DATA, jalankan_rekam, token_youtube=lambda: UNGGAH.token_segar(DATA))
+
+
+def rekam_live(d: dict) -> dict:
+    k = next((x for x in PEMANTAU.kanal() if x["id"] == d.get("id")), None)
+    if not k:
+        raise ValueError("Kanal tidak ditemukan.")
+    return PEMANTAU.mulai_rekam(k)
+
+
+def proses_kandidat(d: dict) -> dict:
+    """Kandidat momen → analisis klip biasa (transkrip, judul, caption), lalu review seperti klip lain."""
+    p = PEMANTAU.berkas_kandidat(str(d.get("kanal", "")), str(d.get("sesi", "")), str(d.get("file", "")))
+    k = next((x for x in PEMANTAU.kanal() if x["id"] == d.get("kanal")), {})
+    durasi = int(min(max(float(d.get("durasi") or 40), 15), 60))
+    out = mulai_klip({"sumber": str(p), "jumlah": 1, "durasi": durasi, "ai": d.get("ai"),
+                      "arahan": f"Potongan live {k.get('label', '')}. Sumber izin: {k.get('izin', '')}"[:300]})
+    (DATA / "klip" / out["proyek"] / "live.json").write_text(json.dumps(
+        {"kanal": k.get("label"), "platform": k.get("platform"), "izin": k.get("izin"), "kampanye": k.get("kampanye"),
+         "url": k.get("url_live"), "kandidat": p.name}, ensure_ascii=False), encoding="utf-8")
+    return out
+
+
 # ── HTTP ────────────────────────────────────────────────────────────────────
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a):
@@ -649,9 +846,31 @@ class H(BaseHTTPRequestHandler):
         asal = self.headers.get("Origin")
         return asal is None or asal in (f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}")
 
+    def _host_aman(self) -> bool:
+        # cegah DNS rebinding: situs lain yang namanya diarahkan ke 127.0.0.1 membawa Host miliknya sendiri
+        return self.headers.get("Host", "") in (f"127.0.0.1:{PORT}", f"localhost:{PORT}")
+
+    def _bukan_lintas_situs(self) -> bool:
+        # cegah situs lain memicu endpoint GET (mis. lewat <img>); peramban lama tanpa Sec-Fetch-Site tetap boleh
+        return self.headers.get("Sec-Fetch-Site", "same-origin") in ("same-origin", "none")
+
+    def _html(self, isi: str, kode=200):
+        b = isi.encode()
+        self.send_response(kode)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(b)))
+        self.end_headers()
+        self.wfile.write(b)
+
     def do_GET(self):
         u = urlparse(self.path)
         jalur = unquote(u.path)
+        if not self._host_aman():
+            return self._json({"galat": "host tidak diizinkan"}, 403)
+        if jalur in ("/oauth/youtube", "/oauth/tiktok"):  # kembali dari halaman izin (lintas situs, dijaga state + PKCE)
+            return self._html(oauth_kembali(jalur.rsplit("/", 1)[1], parse_qs(u.query)))
+        if jalur.startswith(("/api/", "/berkas/")) and not self._bukan_lintas_situs():
+            return self._json({"galat": "asal tidak diizinkan"}, 403)
         try:
             if jalur in ("/", "/index.html"):
                 return self._file(AKAR / "index.html")
@@ -676,6 +895,21 @@ class H(BaseHTTPRequestHandler):
                 return self._json(status_ai())
             if jalur == "/api/proyek":
                 return self._json(daftar_proyek())
+            if jalur == "/api/kampanye":
+                return self._json({"kampanye": CAPTION.daftar_kampanye(DATA), "platform": CAPTION.PLATFORM})
+            if jalur == "/api/antrean":
+                return self._json(ANTREAN.daftar())
+            if jalur == "/api/akun-unggah":
+                return self._json(status_akun())
+            if jalur == "/api/statistik":
+                return self._json(PELACAK.ringkasan())
+            if jalur == "/api/live":
+                return self._json(PEMANTAU.ringkas())
+            if m := re.match(r"^/berkas/live/([\w-]+)/([\w-]+)/(kandidat-\d+\.mp4)$", jalur):
+                try:
+                    return self._file(PEMANTAU.berkas_kandidat(*m.groups()))
+                except ValueError:
+                    return self._json({"galat": "tidak ditemukan"}, 404)
             if m := re.match(r"^/api/jejak/([\w-]+)/(\d+)$", jalur):
                 return self._json(jejak_klip(m.group(1), int(m.group(2))))
             if m := re.match(r"^/api/proyek/(klip|motion)/([\w-]+)$", jalur):
@@ -693,7 +927,7 @@ class H(BaseHTTPRequestHandler):
             pass
 
     def do_POST(self):
-        if not self._asal_aman():
+        if not self._host_aman() or not self._asal_aman():
             return self._json({"galat": "asal tidak diizinkan"}, 403)
         jalur = urlparse(self.path).path
         try:
@@ -714,15 +948,26 @@ class H(BaseHTTPRequestHandler):
                 (DATA / f"suara-referensi.{eks}").write_bytes(self.rfile.read(n))
                 return self._json({"ok": True})
             if jalur == "/api/unggah":
-                nama = re.sub(r"[^\w.-]", "_", self.headers.get("X-Nama-File", "video.mp4"))
+                nama = re.sub(r"[^\w.-]", "_", Path(self.headers.get("X-Nama-File", "video.mp4")).name).lstrip(".")[:120] or "video.mp4"
                 tujuan = DATA / ("aset" if self.headers.get("X-Jenis") == "aset" else "unggahan")
                 tujuan.mkdir(parents=True, exist_ok=True)
-                p = tujuan / nama
                 n = int(self.headers.get("Content-Length") or 0)
+                if n <= 0 or n > BATAS_UNGGAH:
+                    return self._json({"galat": f"Ukuran file harus di bawah {BATAS_UNGGAH // 2**30} GB."}, 413)
+                if shutil.disk_usage(tujuan).free - n < 2 * 2**30:
+                    return self._json({"galat": "Ruang disk tidak cukup (sisakan minimal 2 GB)."}, 507)
+                p = tujuan / nama
+                i = 1
+                while p.exists():  # jangan menimpa file lain yang namanya sama
+                    p = tujuan / f"{Path(nama).stem}-{i}{Path(nama).suffix}"
+                    i += 1
                 with open(p, "wb") as fh:
                     while n > 0 and (blok := self.rfile.read(min(1 << 20, n))):
                         fh.write(blok)
                         n -= len(blok)
+                if n > 0:  # koneksi putus di tengah → buang file setengah jadi
+                    p.unlink(missing_ok=True)
+                    return self._json({"galat": "Unggahan terputus."}, 400)
                 return self._json({"jalur": str(p)})
             d = self._body()
             if jalur == "/api/pengaturan":
@@ -758,6 +1003,65 @@ class H(BaseHTTPRequestHandler):
                 return self._json(simpan_subtitle(d))
             if jalur == "/api/klip-render":
                 return self._json(mulai_render_klip(d))
+            if jalur == "/api/youtube-klien":
+                cid, rahasia = d.get("client_id", ""), d.get("client_secret", "")
+                if d.get("json"):
+                    cid, rahasia = UNGGAH.klien_dari_json(d["json"])
+                UNGGAH.simpan_klien(DATA, cid, rahasia)
+                return self._json(status_akun())
+            if jalur == "/api/tiktok-kreator":
+                return self._json(TT.info_kreator(DATA))
+            if jalur == "/api/tiktok-klien":
+                TT.simpan_klien(DATA, str(d.get("client_key", "")), str(d.get("client_secret", "")))
+                return self._json(status_akun())
+            if jalur == "/api/instagram-token":
+                IG.simpan_token(DATA, str(d.get("token", "")))
+                return self._json(status_akun())
+            if m := re.match(r"^/api/(youtube|tiktok)-masuk$", jalur):
+                return self._json(oauth_masuk(m.group(1)))
+            if m := re.match(r"^/api/(youtube|tiktok|instagram)-putus$", jalur):
+                MODUL_PLATFORM[m.group(1)].hapus_token(DATA)
+                return self._json(status_akun())
+            if jalur == "/api/kampanye-simpan":
+                return self._json({"kampanye": CAPTION.simpan_kampanye(DATA, d)})
+            if jalur == "/api/kampanye-hapus":
+                CAPTION.hapus_kampanye(DATA, str(d.get("id", "")))
+                return self._json({"ok": True})
+            if jalur == "/api/caption":
+                return self._json(susun_caption(d))
+            if jalur == "/api/antrean-batal":
+                return self._json({"ok": ANTREAN.batal(str(d.get("id", "")))})
+            if jalur == "/api/antrean-ulang":
+                return self._json(ANTREAN.ulangi(str(d.get("id", ""))))
+            if jalur == "/api/unggah-klip":
+                return self._json(mulai_unggah(d))
+            if jalur == "/api/statistik-segarkan":
+                return self._json(PELACAK.segarkan())
+            if jalur == "/api/statistik-tautkan":
+                PELACAK.tautkan(str(d.get("platform", "")), str(d.get("id", "")), str(d.get("url", "")))
+                return self._json(PELACAK.ringkasan())
+            if jalur == "/api/statistik-manual":
+                PELACAK.isi_manual(str(d.get("platform", "")), str(d.get("id", "")), d.get("views"))
+                return self._json(PELACAK.ringkasan())
+            if jalur == "/api/live-kunci":
+                return self._json(PEMANTAU.simpan_kunci(d))
+            if jalur == "/api/live-kanal":
+                return self._json({"kanal": PEMANTAU.simpan_kanal(d)})
+            if jalur == "/api/live-hapus":
+                PEMANTAU.hapus_kanal(str(d.get("id", "")))
+                return self._json({"ok": True})
+            if jalur == "/api/live-cek":
+                PEMANTAU.cek()
+                return self._json(PEMANTAU.ringkas())
+            if jalur == "/api/live-rekam":
+                return self._json(rekam_live(d))
+            if jalur == "/api/live-henti":
+                return self._json({"ok": PEMANTAU.hentikan(str(d.get("id", "")))})
+            if jalur == "/api/live-buang":
+                PEMANTAU.buang_kandidat(str(d.get("kanal", "")), str(d.get("sesi", "")), str(d.get("file", "")))
+                return self._json({"ok": True})
+            if jalur == "/api/live-proses":
+                return self._json(proses_kandidat(d))
             if jalur == "/api/hapus-proyek":
                 f = (DATA / d.get("jenis", "") / re.sub(r"[^\w-]", "", d.get("nama", ""))).resolve()
                 if f.is_dir() and DATA.resolve() in f.parents and f.parent.name in ("klip", "motion"):
@@ -771,11 +1075,14 @@ class H(BaseHTTPRequestHandler):
                 f = (DATA / d.get("jenis", "") / d.get("nama", "") / d.get("file", "")).resolve()
                 if not f.is_file() or DATA.resolve() not in f.parents:
                     return self._json({"galat": "berkas tidak ditemukan"}, 404)
-                tujuan = Path.home() / "Downloads" / f"{d.get('nama')}-{f.name}"
+                awal = re.sub(r"[^\w-]", "", str(d.get("nama", "")))[:60] or "studio"
+                tujuan = Path.home() / "Downloads" / f"{awal}-{f.name}"
                 shutil.copy(f, tujuan)
                 return self._json({"jalur": str(tujuan)})
             if jalur == "/api/matikan":
+                PEMANTAU.hentikan_semua()
                 KERJA.batal()
+                KERJA_UNGGAH.batal()
                 threading.Timer(0.3, lambda: os._exit(0)).start()
                 return self._json({"ok": True})
             if jalur == "/api/batal":
@@ -789,6 +1096,10 @@ class H(BaseHTTPRequestHandler):
             self._json({"galat": "tidak ditemukan"}, 404)
         except (ValueError, RuntimeError, json.JSONDecodeError) as e:
             self._json({"galat": str(e)}, 400)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        except Exception as e:  # noqa: BLE001 — selalu jawab, jangan biarkan halaman menggantung
+            self._json({"galat": f"Galat tak terduga: {type(e).__name__}: {e}"}, 500)
 
 
 def buka_folder(f: Path) -> None:
@@ -825,6 +1136,9 @@ def server_hidup(url: str) -> bool:
 def main():
     global PORT
     DATA.mkdir(parents=True, exist_ok=True)
+    ANTREAN.mulai()
+    PEMANTAU.mulai()
+    PELACAK.mulai()
     # Port 8787 bisa dipakai aplikasi lain (mis. server pengembangan). Cari Studio yang sudah jalan,
     # kalau tidak ada, pakai port kosong pertama dari 8787–8806.
     sudah, srv = False, None
@@ -869,6 +1183,10 @@ def main():
 
     class Jembatan:
         def unduh(self, nama: str, isi: str) -> str:
+            # hanya nama file (tanpa folder) → tidak bisa menulis di luar Downloads
+            nama = re.sub(r"[^\w. ()-]", "_", Path(str(nama)).name).lstrip(".")[:120] or "unduhan.txt"
+            if Path(nama).suffix.lower() not in (".json", ".srt", ".txt", ".md", ".csv", ".vtt"):
+                nama += ".txt"
             tujuan = Path.home() / "Downloads" / nama
             tujuan.write_text(isi, encoding="utf-8")
             return str(tujuan)
@@ -914,7 +1232,9 @@ def main():
     webview.create_window("Studio Maliki", url, width=1360, height=880, min_size=(900, 640),
                           background_color="#07090F", js_api=Jembatan())
     webview.start(setelah_mulai)
+    PEMANTAU.hentikan_semua()
     KERJA.batal()
+    KERJA_UNGGAH.batal()
     os._exit(0)
 
 
