@@ -471,6 +471,7 @@ main{position:relative;z-index:1}
     <button class="nav" data-ke="klip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12"/></svg>Klip</button>
     <button class="nav" data-ke="motion"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="m10 8 6 4-6 4z"/></svg>Motion</button>
     <div class="label-kecil">Pustaka</div>
+    <button class="nav" data-ke="kampanye"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>Kampanye</button>
     <button class="nav" data-ke="antrean"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/></svg>Antrean <span class="lencana" id="nAntrean" hidden style="margin-left:auto;padding:1px 7px">0</span></button>
     <button class="nav" data-ke="riwayat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>Riwayat</button>
     <button class="nav" data-ke="pengaturan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>Pengaturan AI</button>
@@ -688,6 +689,31 @@ main{position:relative;z-index:1}
     </section>
 
     <!-- PENGATURAN -->
+    <section class="halaman" id="h-kampanye">
+      <div class="kepala"><div><div class="eyebrow">program clipper · aturan per kampanye</div><h1>Kampanye</h1>
+        <p>Simpan aturan tiap kampanye clipper yang kamu ikuti. Saat unggah, caption otomatis memuat tag, mention, dan teks wajibnya,
+          dan Studio memberi peringatan bila durasi atau platformnya tidak sesuai.</p></div></div>
+      <div class="grid2">
+        <div class="kartu" id="formKampanye"><h2 class="judul-kartu"><i></i><span id="kmJudulForm">kampanye baru</span></h2>
+          <input type="hidden" id="kmId">
+          <div class="bidang"><label>Nama kampanye</label><input class="input" id="kmNama" placeholder="mis. Whop · Podcast X Clips"></div>
+          <div class="bidang"><label>Platform tujuan</label><div class="pil" id="kmPlatform" style="flex-wrap:wrap"></div></div>
+          <div class="bidang"><label>Bukti izin <em>wajib · link kampanye atau izin tertulis</em></label><input class="input" id="kmIzin" placeholder="https://whop.com/…"></div>
+          <div class="bidang"><label>Hashtag wajib <em>pisahkan dengan koma</em></label><input class="input" id="kmTag" placeholder="podcastx, clips"></div>
+          <div class="bidang"><label>Mention wajib</label><input class="input" id="kmMention" placeholder="@podcastx"></div>
+          <div class="bidang"><label>Teks wajib <em>mis. pengungkapan iklan</em></label><input class="input" id="kmTeks" placeholder="#ad · Klip resmi dari kampanye Podcast X"></div>
+          <div class="grid2" style="gap:10px"><div class="bidang"><label>Durasi min (dtk)</label><input class="input" id="kmMin" type="number" min="0"></div>
+            <div class="bidang"><label>Durasi maks (dtk)</label><input class="input" id="kmMaks" type="number" min="0"></div></div>
+          <div class="grid2" style="gap:10px"><div class="bidang"><label>Tarif per 1.000 views</label><input class="input" id="kmTarif" type="number" min="0" step="0.01"></div>
+            <div class="bidang"><label>Mata uang</label><input class="input" id="kmUang" value="USD" maxlength="3"></div></div>
+          <label class="saklar" style="justify-content:flex-start;gap:10px"><input type="checkbox" id="kmMerek"> Konten bermerek / berbayar (tandai "konten berbayar" saat posting)</label>
+          <div class="bidang" style="margin-top:10px"><label>Catatan</label><textarea class="input" id="kmCatatan" rows="3" placeholder="aturan lain dari kampanye"></textarea></div>
+          <div class="aksi"><button class="tombol utama" id="kmSimpan">Simpan kampanye</button><button class="tombol kedua" id="kmBaru">Kosongkan</button></div>
+        </div>
+        <div id="daftarKampanye"></div>
+      </div>
+    </section>
+
     <section class="halaman" id="h-antrean">
       <div class="kepala"><div><div class="eyebrow">antrean kerja · tersimpan di laptopmu</div><h1>Antrean</h1>
         <p>Analisis, render, dan unggah masuk antrean. Jalur <b>utama</b> (analisis/render/motion) dan jalur <b>unggah</b> berjalan bersamaan.
@@ -790,6 +816,8 @@ main{position:relative;z-index:1}
   <div class="wiz-isi" style="display:grid;grid-template-columns:200px 1fr;gap:18px;overflow:auto">
     <video id="ugVideo" controls playsinline style="width:200px;aspect-ratio:9/16;border-radius:12px;background:#000"></video>
     <div>
+      <div class="bidang"><label>Kampanye <em>caption mengikuti aturannya</em></label><select class="input" id="ugKampanye"><option value="">Tanpa kampanye</option></select></div>
+      <div class="catatan" id="ugPeringatan" hidden style="margin:0 0 12px;color:var(--oranye)"></div>
       <div class="bidang"><label>Judul <em id="ugHitung">0/100</em></label><input class="input" id="ugJudul" maxlength="100"></div>
       <div class="bidang"><label>Deskripsi <em>sertakan kredit sumber, mis. "Sumber: @namastreamer"</em></label><textarea class="input" id="ugDesk" rows="5"></textarea></div>
       <div class="bidang"><label>Tag <em>pisahkan dengan koma</em></label><input class="input" id="ugTag"></div>
@@ -950,7 +978,7 @@ $('#wizLanjut').onclick = () => { if (WIZ.langkah === 4) return tutupWizard(); W
 $('#wizKembali').onclick = () => { WIZ.langkah = Math.max(1, WIZ.langkah - 1); gambarWizard(); };
 $$('[data-wiz-ke]').forEach((k) => k.onclick = () => tutupWizard(k.dataset.wizKe));
 $('#bukaWizard').onclick = () => bukaWizard();
-function ke(h) { $$('.nav').forEach((n) => n.classList.toggle('aktif', n.dataset.ke === h)); $$('.halaman').forEach((x) => x.classList.toggle('aktif', x.id === 'h-' + h)); if (h === 'beranda') muatBeranda(); if (h === 'antrean') muatAntrean();
+function ke(h) { $$('.nav').forEach((n) => n.classList.toggle('aktif', n.dataset.ke === h)); $$('.halaman').forEach((x) => x.classList.toggle('aktif', x.id === 'h-' + h)); if (h === 'beranda') muatBeranda(); if (h === 'antrean') muatAntrean(); if (h === 'kampanye') muatKampanye();
   if (h === 'pengaturan') muatStatusAI();
   if (h === 'riwayat') { muatRiwayat(); $('#cariRiwayat').oninput = muatRiwayat; } if (h === 'pengaturan') muatPengaturan(); }
 $$('.nav').forEach((n) => n.onclick = () => ke(n.dataset.ke));
@@ -1308,14 +1336,23 @@ async function bukaUnggah(k) {
   $('#ugKet').textContent = `klip ${k.no} · ${Math.round(k.selesai - k.mulai)} detik · akun ${y.kanal || 'YouTube'}`;
   $('#ugVideo').src = `/berkas/klip/${KLIP.h.nama}/${k.file}`;
   $('#ugJudul').value = (KLIP.judul[k.no] ?? k.judul ?? '').slice(0, 100);
-  const tag = (KLIP.h.info?.hashtag || []).map((t) => t.replace(/^#/, ''));
-  $('#ugDesk').value = `${k.caption || k.judul || ''}\n\n${tag.map((t) => '#' + t).join(' ')} #Shorts`.trim();
-  $('#ugTag').value = tag.join(', ');
   $('#ugSumberIzin').value = ''; $('#ugIzin').checked = false; $('#ugAnak').checked = false;
+  await muatKampanye(); await isiCaptionYT();
   $$('#ugPrivasi button').forEach((b) => b.classList.toggle('aktif', b.dataset.v === 'private'));
   $('#ugHitung').textContent = `${$('#ugJudul').value.length}/100`;
   $('#dlgUnggah').hidden = false;
 }
+async function isiCaptionYT() {
+  if (!UG) return;
+  try {
+    const c = await api('/api/caption', {nama: KLIP.h.nama, no: UG.no, platform: 'youtube', kampanye: $('#ugKampanye').value, judul: KLIP.judul[UG.no]});
+    $('#ugJudul').value = c.judul; $('#ugDesk').value = c.teks; $('#ugTag').value = c.tag.join(', ');
+    if (c.sumber_izin) $('#ugSumberIzin').value = c.sumber_izin;
+    $('#ugPeringatan').hidden = !c.peringatan.length; $('#ugPeringatan').innerHTML = c.peringatan.map((x) => '⚠ ' + esc(x)).join('<br>');
+    $('#ugHitung').textContent = `${$('#ugJudul').value.length}/100`;
+  } catch (e) { toast(e.message, true); }
+}
+$('#ugKampanye').onchange = isiCaptionYT;
 const tutupUnggah = () => { $('#dlgUnggah').hidden = true; $('#ugVideo').pause(); UG = null; };
 $('#ugBatal').onclick = tutupUnggah;
 $('#ugJudul').oninput = () => { $('#ugHitung').textContent = `${$('#ugJudul').value.length}/100`; };
@@ -1327,12 +1364,53 @@ $('#ugKirim').onclick = async () => {
   try {
     await api('/api/unggah-klip', {platform: 'youtube', nama: KLIP.h.nama, no: UG.no, judul: $('#ugJudul').value, deskripsi: $('#ugDesk').value,
       tag: $('#ugTag').value.split(',').map((t) => t.trim()).filter(Boolean), privasi: UG.privasi, untuk_anak: $('#ugAnak').checked,
-      sumber_izin: $('#ugSumberIzin').value, izin: true});
+      sumber_izin: $('#ugSumberIzin').value, kampanye: $('#ugKampanye').value, izin: true});
     muatAntrean();
     tutupUnggah(); toast('Masuk antrean unggah. Render tetap bisa jalan. Pantau di menu Antrean.');
   } catch (e) { toast(e.message, true); }
 };
 muatAkun();
+// ── Kampanye clipper ──
+let KAMPANYE = [], PLATFORM = {};
+async function muatKampanye() {
+  try { const d = await api('/api/kampanye'); KAMPANYE = d.kampanye; PLATFORM = d.platform; } catch { return; }
+  if (!$('#kmPlatform').children.length) {
+    $('#kmPlatform').innerHTML = Object.entries(PLATFORM).map(([id, p]) => `<button data-v="${id}">${esc(p.nama)}</button>`).join('');
+    $$('#kmPlatform button').forEach((b) => b.onclick = () => b.classList.toggle('aktif'));
+  }
+  const sel = $('#ugKampanye'); const pilih = sel.value;
+  sel.innerHTML = '<option value="">Tanpa kampanye</option>' + KAMPANYE.map((k) => `<option value="${esc(k.id)}">${esc(k.nama)}</option>`).join('');
+  sel.value = KAMPANYE.some((k) => k.id === pilih) ? pilih : '';
+  $('#daftarKampanye').innerHTML = KAMPANYE.length ? KAMPANYE.map((k) => `<div class="kartu" style="margin-bottom:12px">
+      <div style="display:flex;gap:10px;align-items:center"><b style="flex:1">${esc(k.nama)}</b>
+        <button class="tombol kedua kecil" data-kmedit="${esc(k.id)}">Ubah</button><button class="tombol kedua kecil" data-kmhapus="${esc(k.id)}">Hapus</button></div>
+      <div class="baris-meta" style="margin:8px 0">${(k.platform || []).map((p) => `<span class="lencana">${esc(PLATFORM[p]?.nama || p)}</span>`).join('')}
+        ${k.tarif_per_1000 ? `<span class="lencana">${esc(k.mata_uang)} ${k.tarif_per_1000} / 1.000 views</span>` : ''}
+        ${k.durasi_min || k.durasi_maks ? `<span class="lencana">${k.durasi_min || 0}–${k.durasi_maks || '∞'} dtk</span>` : ''}</div>
+      <small style="color:var(--redup)">${[k.tag_wajib?.map((t) => '#' + t).join(' '), (k.mention_wajib || []).join(' '), k.teks_wajib].filter(Boolean).map(esc).join(' · ')}</small>
+    </div>`).join('') : '<div class="kartu kosong"><b>Belum ada kampanye</b>Tambahkan kampanye clipper yang sudah kamu ikuti dan memberi izin.</div>';
+  $$('[data-kmedit]').forEach((b) => b.onclick = () => isiFormKampanye(KAMPANYE.find((k) => k.id === b.dataset.kmedit)));
+  $$('[data-kmhapus]').forEach((b) => b.onclick = async () => { if (!confirm('Hapus kampanye ini?')) return; await api('/api/kampanye-hapus', {id: b.dataset.kmhapus}); muatKampanye(); });
+}
+function isiFormKampanye(k = {}) {
+  $('#kmId').value = k.id || ''; $('#kmNama').value = k.nama || ''; $('#kmIzin').value = k.sumber_izin || '';
+  $('#kmTag').value = (k.tag_wajib || []).join(', '); $('#kmMention').value = (k.mention_wajib || []).join(', ');
+  $('#kmTeks').value = k.teks_wajib || ''; $('#kmMin').value = k.durasi_min || ''; $('#kmMaks').value = k.durasi_maks || '';
+  $('#kmTarif').value = k.tarif_per_1000 || ''; $('#kmUang').value = k.mata_uang || 'USD'; $('#kmMerek').checked = !!k.konten_bermerek;
+  $('#kmCatatan').value = k.catatan || ''; $('#kmJudulForm').textContent = k.id ? 'ubah kampanye' : 'kampanye baru';
+  $$('#kmPlatform button').forEach((b) => b.classList.toggle('aktif', (k.platform || []).includes(b.dataset.v)));
+}
+$('#kmBaru').onclick = () => isiFormKampanye();
+$('#kmSimpan').onclick = async () => {
+  try {
+    await api('/api/kampanye-simpan', {id: $('#kmId').value, nama: $('#kmNama').value, sumber_izin: $('#kmIzin').value,
+      platform: $$('#kmPlatform button.aktif').map((b) => b.dataset.v), tag_wajib: $('#kmTag').value, mention_wajib: $('#kmMention').value,
+      teks_wajib: $('#kmTeks').value, durasi_min: $('#kmMin').value, durasi_maks: $('#kmMaks').value, tarif_per_1000: $('#kmTarif').value,
+      mata_uang: $('#kmUang').value, konten_bermerek: $('#kmMerek').checked, catatan: $('#kmCatatan').value});
+    toast('Kampanye tersimpan ✓'); isiFormKampanye(); muatKampanye();
+  } catch (e) { toast(e.message, true); }
+};
+
 // ── Halaman Antrean ──
 const LABEL_STATUS = {menunggu: '⏳ menunggu', jalan: '▶ berjalan', selesai: '✓ selesai', gagal: '✕ gagal', batal: '⊘ dibatalkan'};
 const waktuLokal = (t) => t ? new Date(t * 1000).toLocaleString('id-ID', {day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'}) : '';

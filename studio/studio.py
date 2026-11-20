@@ -30,6 +30,7 @@ AKAR = Path(__file__).resolve().parent
 sys.path.insert(0, str(AKAR))
 import unggah as UNGGAH  # noqa: E402  (pustaka standar saja)
 from antrean import Antrean, Kerja  # noqa: E402
+import caption as CAPTION  # noqa: E402
 
 ALAT = AKAR.parent
 KLIP = ALAT / "klip"
@@ -582,6 +583,26 @@ def oauth_youtube_kembali(q: dict) -> str:
     return halaman("YouTube tersambung ✓", "Tutup tab ini lalu kembali ke Studio Maliki.")
 
 
+def _klip_proyek(nama: str, no: int) -> tuple[Path, dict, dict]:
+    folder = DATA / "klip" / re.sub(r"[^\w-]", "", str(nama or ""))
+    if not (folder / "klip.json").exists():
+        raise ValueError("Proyek tidak ditemukan.")
+    klip = next((x for x in json.loads((folder / "klip.json").read_text(encoding="utf-8")) if x.get("no") == int(no)), None)
+    if not klip:
+        raise ValueError("Klip tidak ditemukan.")
+    info = json.loads((folder / "info.json").read_text(encoding="utf-8")) if (folder / "info.json").exists() else {}
+    return folder, klip, info
+
+
+def susun_caption(d: dict) -> dict:
+    """Judul/caption/hashtag per platform, sudah memuat aturan kampanye yang dipilih."""
+    _, klip, info = _klip_proyek(d.get("nama"), d.get("no", 0))
+    if d.get("judul"):
+        klip = {**klip, "judul_banner": str(d["judul"])[:200]}
+    kamp = CAPTION.cari_kampanye(DATA, str(d.get("kampanye") or ""))
+    return CAPTION.susun(klip, info, str(d.get("platform", "youtube")), kamp)
+
+
 def mulai_unggah(d: dict) -> dict:
     """Unggah satu klip yang SUDAH direview pengguna. Tanpa centang izin, permintaan ditolak."""
     if d.get("platform", "youtube") != "youtube":
@@ -599,6 +620,10 @@ def mulai_unggah(d: dict) -> dict:
         raise ValueError("Klip belum dirender. Render dulu, lalu unggah.")
     meta = UNGGAH.rapikan_meta(d)
     meta["sumber_izin"] = str(d.get("sumber_izin", ""))[:300]
+    kamp = CAPTION.cari_kampanye(DATA, str(d.get("kampanye") or ""))
+    meta["kampanye"] = kamp["id"] if kamp else ""
+    if kamp and not meta["sumber_izin"]:
+        meta["sumber_izin"] = kamp.get("sumber_izin", "")
     berkas = folder / Path(klip["file"]).name
     f_meta = folder / f"unggah-{no:02d}.json"
     f_hasil = folder / f"unggah-{no:02d}-hasil.json"
@@ -608,7 +633,8 @@ def mulai_unggah(d: dict) -> dict:
            "--meta", str(f_meta), "--hasil", str(f_hasil)]
 
     t = ANTREAN.tambah("unggah", "unggah", [(cmd, AKAR)], folder,
-                       ("unggah_selesai", {"nama": nama, "no": no, "f_hasil": str(f_hasil), "sumber_izin": meta["sumber_izin"]}),
+                       ("unggah_selesai", {"nama": nama, "no": no, "f_hasil": str(f_hasil), "sumber_izin": meta["sumber_izin"],
+                                          "kampanye": meta["kampanye"]}),
                        label=f"YouTube: {meta['judul']}"[:120], platform="youtube", info={"proyek": nama, "no": no})
     return {"proyek": nama, **t}
 
@@ -627,13 +653,13 @@ def _setelah_motion(k: Kerja, nama: str):
     k.hasil = muat_proyek("motion", nama)
 
 
-def _setelah_unggah(k: Kerja, nama: str, no: int, f_hasil: str, sumber_izin: str = ""):
+def _setelah_unggah(k: Kerja, nama: str, no: int, f_hasil: str, sumber_izin: str = "", kampanye: str = ""):
     f_hasil = Path(f_hasil)
     folder = DATA / "klip" / nama
     if not f_hasil.exists():
         return
     hasil = json.loads(f_hasil.read_text(encoding="utf-8"))
-    hasil.update(proyek=nama, no=no, sumber_izin=sumber_izin)
+    hasil.update(proyek=nama, no=no, sumber_izin=sumber_izin, kampanye=kampanye)
     semua = json.loads((folder / "klip.json").read_text(encoding="utf-8"))
     for x in semua:
         if x.get("no") == no:
@@ -754,6 +780,8 @@ class H(BaseHTTPRequestHandler):
                 return self._json(status_ai())
             if jalur == "/api/proyek":
                 return self._json(daftar_proyek())
+            if jalur == "/api/kampanye":
+                return self._json({"kampanye": CAPTION.daftar_kampanye(DATA), "platform": CAPTION.PLATFORM})
             if jalur == "/api/antrean":
                 return self._json(ANTREAN.daftar())
             if jalur == "/api/akun-unggah":
@@ -851,6 +879,13 @@ class H(BaseHTTPRequestHandler):
             if jalur == "/api/youtube-putus":
                 UNGGAH.hapus_token(DATA)
                 return self._json({"youtube": UNGGAH.status(DATA)})
+            if jalur == "/api/kampanye-simpan":
+                return self._json({"kampanye": CAPTION.simpan_kampanye(DATA, d)})
+            if jalur == "/api/kampanye-hapus":
+                CAPTION.hapus_kampanye(DATA, str(d.get("id", "")))
+                return self._json({"ok": True})
+            if jalur == "/api/caption":
+                return self._json(susun_caption(d))
             if jalur == "/api/antrean-batal":
                 return self._json({"ok": ANTREAN.batal(str(d.get("id", "")))})
             if jalur == "/api/antrean-ulang":
