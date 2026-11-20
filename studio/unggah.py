@@ -3,7 +3,7 @@
 # dependencies = []
 # ///
 # kredit-maliki: Template oleh Maliki Saputra (@malikisaputra) — https://malikisaputra.biz.id · Lisensi Nonkomersial Maliki Studio 1.0 (alat/LISENSI.md): dilarang dijual ulang.
-"""Unggah klip ke media sosial lewat API resmi (saat ini: YouTube / Shorts).
+"""Unggah klip ke media sosial lewat API resmi: YouTube Shorts (di sini), TikTok, dan Instagram Reels.
 
 Hanya pustaka standar Python, jadi tidak menambah paket di installer.
 
@@ -34,7 +34,8 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-SCOPE = "https://www.googleapis.com/auth/youtube.upload"
+# upload = unggah; readonly = membaca jumlah views untuk halaman Statistik
+SCOPE = "https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly"
 URL_IZIN = "https://accounts.google.com/o/oauth2/v2/auth"
 URL_TOKEN = "https://oauth2.googleapis.com/token"
 URL_CABUT = "https://oauth2.googleapis.com/revoke"
@@ -291,8 +292,27 @@ def unggah_youtube(data: Path, berkas: Path, meta: dict) -> dict:
             "judul": m["judul"], "waktu": time.strftime("%Y-%m-%dT%H:%M:%S%z")}
 
 
+def statistik(data: Path, id_video: list[str]) -> dict:
+    """views/suka/komentar per video (butuh scope youtube.readonly; akun lama perlu disambungkan ulang)."""
+    ids = [i for i in id_video if i][:50]
+    if not ids:
+        return {}
+    req = urllib.request.Request("https://www.googleapis.com/youtube/v3/videos?part=statistics&id=" + ",".join(ids),
+                                 headers={"Authorization": f"Bearer {token_segar(data)}"})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            items = json.loads(r.read()).get("items", [])
+    except urllib.error.HTTPError as e:
+        if e.code == 403:
+            raise RuntimeError("Izin membaca statistik YouTube belum ada. Putuskan lalu sambungkan ulang akun YouTube.") from None
+        raise RuntimeError(_jelaskan(e)) from None
+    return {x["id"]: {"views": int(x["statistics"].get("viewCount", 0)), "suka": int(x["statistics"].get("likeCount", 0)),
+                      "komentar": int(x["statistics"].get("commentCount", 0)), "bagikan": 0} for x in items}
+
+
 def main() -> None:
-    p = argparse.ArgumentParser(description="Unggah video ke YouTube lewat API resmi.")
+    p = argparse.ArgumentParser(description="Unggah video ke YouTube, TikTok, atau Instagram lewat API resmi.")
+    p.add_argument("--platform", default="youtube", choices=["youtube", "tiktok", "instagram"])
     p.add_argument("--data", required=True, help="folder data Studio (berisi .rahasia)")
     p.add_argument("--berkas", required=True, help="video MP4")
     p.add_argument("--meta", required=True, help="JSON metadata (judul, deskripsi, tag, privasi)")
@@ -300,12 +320,19 @@ def main() -> None:
     a = p.parse_args()
     data = Path(a.data).expanduser()
     try:
-        out = unggah_youtube(data, Path(a.berkas), json.loads(Path(a.meta).read_text(encoding="utf-8")))
+        meta = json.loads(Path(a.meta).read_text(encoding="utf-8"))
+        if a.platform == "tiktok":
+            from unggah_tiktok import unggah_tiktok as fungsi
+        elif a.platform == "instagram":
+            from unggah_instagram import unggah_instagram as fungsi
+        else:
+            fungsi = unggah_youtube
+        out = fungsi(data, Path(a.berkas), meta)
     except (RuntimeError, ValueError) as e:
         sys.exit(str(e))
     if a.hasil:
         Path(a.hasil).write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
-    log(f"Selesai: {out['url']} ({out['privasi']})")
+    log(f"Selesai: {out.get('url') or out.get('id')} ({out['privasi']})")
 
 
 if __name__ == "__main__":

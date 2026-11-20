@@ -190,6 +190,11 @@ textarea.input{min-height:110px;resize:vertical;line-height:1.5}
 .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);opacity:0;background:var(--panel);border:1px solid var(--garis2);padding:11px 18px;border-radius:999px;transition:.4s var(--ease);font-size:13px;z-index:9;pointer-events:none}
 .toast.tampil{opacity:1;transform:translateX(-50%)}
 .toast.galat{border-color:var(--merah)}
+.ug-isi{display:grid;grid-template-columns:200px 1fr;gap:18px;overflow:auto}
+.ug-tab{margin:0 0 12px}
+details.akun{border-top:1px dashed var(--garis);padding:12px 0}
+details.akun summary{cursor:pointer;display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+@media (max-width:700px){.ug-isi{grid-template-columns:1fr}}
 .mesin-mati{position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:color-mix(in srgb,var(--bg) 85%,transparent);backdrop-filter:blur(6px)}
 .mesin-mati .mm-kotak{display:block;max-width:440px;margin:16px;background:var(--panel);border:1px solid var(--merah);border-radius:20px;padding:26px 28px}
 .mesin-mati h2{font-size:20px;margin:10px 0 8px}
@@ -790,20 +795,41 @@ main{position:relative;z-index:1}
         </div>
         <div class="aksi"><button class="tombol utama" id="tblSimpanSuara">Simpan suara</button></div>
       </div>
-      <div class="kartu" style="margin-top:16px" id="kartuAkun"><h2 class="judul-kartu"><i style="background:var(--merah)"></i>Akun unggah · YouTube</h2>
-        <div class="ringkas" id="statusYT" style="margin:0 0 12px"></div>
-        <div id="bagKlienYT">
-          <div class="catatan" style="margin:0 0 12px">Unggah memakai <b>YouTube Data API resmi</b> dengan proyek Google Cloud milikmu sendiri (gratis, kuota ±6 video/hari).
+      <div class="kartu" style="margin-top:16px" id="kartuAkun"><h2 class="judul-kartu"><i style="background:var(--merah)"></i>Akun unggah</h2>
+        <div class="catatan" style="margin:0 0 14px">Semua memakai <b>API resmi</b> dengan aplikasi developer milikmu sendiri. Kunci dan token hanya disimpan di laptop ini.
+          Setiap unggahan selalu lewat layar review dulu.</div>
+        <details class="akun" id="akunYT"><summary><b>YouTube Shorts</b> <span class="ringkas" id="statusYT" style="display:inline-flex;margin:0 0 0 8px"></span></summary>
+          <div class="catatan" style="margin:10px 0 12px">Gratis, kuota ±6 video/hari.
             1) Buka <a href="#" data-tautan-luar="https://console.cloud.google.com/apis/library/youtube.googleapis.com">Google Cloud Console</a>, aktifkan <b>YouTube Data API v3</b>.
             2) Atur <i>OAuth consent screen</i> dan tambahkan emailmu sebagai test user.
             3) Buat <a href="#" data-tautan-luar="https://console.cloud.google.com/apis/credentials">OAuth client ID</a> jenis <b>Desktop app</b>, lalu tempel di bawah.
-            Selama proyek belum lolos audit Google, video hanya bisa diunggah sebagai <b>privat</b>; ubah ke publik dari YouTube Studio.</div>
+            Selama proyek belum lolos audit Google, video hanya bisa diunggah sebagai <b>privat</b>.</div>
           <div class="bidang"><label>Client ID</label><input class="input" id="ytClientId" placeholder="xxxx.apps.googleusercontent.com" autocomplete="off"></div>
           <div class="bidang"><label>Client secret</label><input class="input" id="ytClientSecret" type="password" autocomplete="off"></div>
-          <div class="aksi" style="margin:0 0 12px"><button class="tombol kedua kecil" id="tblSimpanKlienYT">Simpan client</button></div>
-        </div>
-        <div class="aksi" style="margin:0"><button class="tombol utama kecil" id="tblMasukYT">Sambungkan YouTube</button>
-          <button class="tombol kedua kecil" id="tblPutusYT" hidden>Putuskan</button></div>
+          <div class="aksi" style="margin:0"><button class="tombol kedua kecil" id="tblSimpanKlienYT">Simpan client</button>
+            <button class="tombol utama kecil" data-masuk="youtube">Sambungkan YouTube</button><button class="tombol kedua kecil" data-putus="youtube" hidden>Putuskan</button></div>
+        </details>
+        <details class="akun" id="akunTT"><summary><b>TikTok</b> <span class="ringkas" id="statusTT" style="display:inline-flex;margin:0 0 0 8px"></span></summary>
+          <div class="catatan" style="margin:10px 0 12px">1) Buat aplikasi di <a href="#" data-tautan-luar="https://developers.tiktok.com/apps">TikTok for Developers</a> (platform <b>Desktop</b>),
+            tambahkan produk <b>Login Kit</b> dan <b>Content Posting API</b> (aktifkan Direct Post bila perlu).
+            2) Daftarkan redirect URI <code id="ttRedirect"></code>.
+            3) Tempel Client key dan Client secret di bawah. Sebelum aplikasimu lolos audit TikTok, posting langsung hanya bisa <b>privat</b>;
+            mode <b>draf</b> mengirim video ke kotak masuk TikTok untuk kamu selesaikan di HP.</div>
+          <div class="bidang"><label>Client key</label><input class="input" id="ttKey" autocomplete="off"></div>
+          <div class="bidang"><label>Client secret</label><input class="input" id="ttSecret" type="password" autocomplete="off"></div>
+          <div class="aksi" style="margin:0"><button class="tombol kedua kecil" id="tblSimpanKlienTT">Simpan client</button>
+            <button class="tombol utama kecil" data-masuk="tiktok">Sambungkan TikTok</button><button class="tombol kedua kecil" data-putus="tiktok" hidden>Putuskan</button></div>
+        </details>
+        <details class="akun" id="akunIG"><summary><b>Instagram Reels</b> <span class="ringkas" id="statusIG" style="display:inline-flex;margin:0 0 0 8px"></span></summary>
+          <div class="catatan" style="margin:10px 0 12px">Butuh akun Instagram <b>Business/Creator</b>.
+            1) Buat aplikasi di <a href="#" data-tautan-luar="https://developers.facebook.com/apps">Meta for Developers</a>, tambahkan produk <b>Instagram</b> (API setup with Instagram login).
+            2) Di bagian <i>Generate access tokens</i>, tambahkan akunmu lalu buat token (izin <code>instagram_business_basic</code> dan <code>instagram_business_content_publish</code>).
+            3) Tempel tokennya di bawah. Token diperpanjang otomatis; batas 100 posting API per 24 jam.</div>
+          <div class="bidang"><label>Token akses</label><input class="input" id="igToken" type="password" autocomplete="off"></div>
+          <div class="aksi" style="margin:0"><button class="tombol utama kecil" id="tblSimpanIG">Simpan &amp; sambungkan</button><button class="tombol kedua kecil" data-putus="instagram" hidden>Putuskan</button></div>
+        </details>
+        <div class="bidang" style="margin:16px 0 0"><label>Jeda minimum antar-posting per platform <em>menit · mencegah dianggap spam</em></label>
+          <div style="display:flex;gap:10px"><input class="input" id="jedaPosting" type="number" min="0" max="1440" style="max-width:140px"><button class="tombol kedua kecil" id="tblSimpanJeda">Simpan</button></div></div>
       </div>
       <div class="kartu" style="margin-top:16px"><h2 class="judul-kartu"><i style="background:var(--hijau)"></i>Cek sistem</h2>
         <div class="aksi" style="margin:0 0 12px"><button class="tombol kedua kecil" id="bukaWizard">Buka wizard pemasangan</button></div><div id="cekSistem" class="ringkas" style="margin:0"></div></div>
@@ -811,23 +837,50 @@ main{position:relative;z-index:1}
   </main>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
-<div class="tirai" id="dlgUnggah" hidden role="dialog" aria-labelledby="ugJudulDlg"><div class="wiz" style="width:min(820px,94vw)">
-  <div class="wiz-kepala"><div><h2 id="ugJudulDlg">Review sebelum unggah ke YouTube</h2><small id="ugKet"></small></div></div>
-  <div class="wiz-isi" style="display:grid;grid-template-columns:200px 1fr;gap:18px;overflow:auto">
-    <video id="ugVideo" controls playsinline style="width:200px;aspect-ratio:9/16;border-radius:12px;background:#000"></video>
+<div class="tirai" id="dlgUnggah" hidden role="dialog" aria-labelledby="ugJudulDlg"><div class="wiz" style="width:min(920px,94vw)">
+  <div class="wiz-kepala"><div><h2 id="ugJudulDlg">Review sebelum unggah</h2><small id="ugKet"></small></div></div>
+  <div class="wiz-isi ug-isi">
+    <div><video id="ugVideo" controls playsinline style="width:200px;aspect-ratio:9/16;border-radius:12px;background:#000"></video><div id="ugSampul"></div></div>
     <div>
       <div class="bidang"><label>Kampanye <em>caption mengikuti aturannya</em></label><select class="input" id="ugKampanye"><option value="">Tanpa kampanye</option></select></div>
-      <div class="catatan" id="ugPeringatan" hidden style="margin:0 0 12px;color:var(--oranye)"></div>
-      <div class="bidang"><label>Judul <em id="ugHitung">0/100</em></label><input class="input" id="ugJudul" maxlength="100"></div>
-      <div class="bidang"><label>Deskripsi <em>sertakan kredit sumber, mis. "Sumber: @namastreamer"</em></label><textarea class="input" id="ugDesk" rows="5"></textarea></div>
-      <div class="bidang"><label>Tag <em>pisahkan dengan koma</em></label><input class="input" id="ugTag"></div>
-      <div class="bidang"><label>Privasi</label><div class="pil" id="ugPrivasi"><button data-v="private" class="aktif">Privat</button><button data-v="unlisted">Tidak publik</button><button data-v="public">Publik</button></div></div>
-      <div class="bidang"><label>Izin konten <em>program clipper / kampanye / izin tertulis</em></label><input class="input" id="ugSumberIzin" placeholder="mis. Kampanye Whop 'X Clips' atau link izin dari streamer"></div>
-      <label class="saklar" style="justify-content:flex-start;gap:10px"><input type="checkbox" id="ugAnak"> Video ini dibuat untuk anak-anak (wajib dijawab jujur sesuai aturan YouTube/COPPA)</label>
+      <div class="bidang"><label>Unggah ke <em>pilih satu atau lebih</em></label><div class="pil" id="ugPlatform"></div></div>
+      <div class="pil ug-tab" id="ugTab"></div>
+      <div class="ug-panel" data-panel="youtube" hidden>
+        <div class="catatan ug-peringatan" hidden></div>
+        <div class="bidang"><label>Judul <em class="ug-hitung" data-untuk="ytJudul" data-maks="100"></em></label><input class="input" id="ytJudul" maxlength="100"></div>
+        <div class="bidang"><label>Deskripsi <em class="ug-hitung" data-untuk="ytDesk" data-maks="5000"></em></label><textarea class="input" id="ytDesk" rows="5"></textarea></div>
+        <div class="bidang"><label>Tag <em>pisahkan dengan koma</em></label><input class="input" id="ytTag"></div>
+        <div class="bidang"><label>Privasi</label><div class="pil" id="ytPrivasi"><button data-v="private" class="aktif">Privat</button><button data-v="unlisted">Tidak publik</button><button data-v="public">Publik</button></div></div>
+        <label class="saklar" style="justify-content:flex-start;gap:10px"><input type="checkbox" id="ytAnak"> Dibuat untuk anak-anak (wajib dijawab jujur sesuai aturan YouTube/COPPA)</label>
+      </div>
+      <div class="ug-panel" data-panel="tiktok" hidden>
+        <div class="catatan ug-peringatan" hidden></div>
+        <div class="catatan" id="ttKreator" style="margin:0 0 10px"></div>
+        <div class="bidang"><label>Cara kirim</label><div class="pil" id="ttMode"><button data-v="draf" class="aktif">Draf di aplikasi TikTok</button><button data-v="langsung">Posting langsung</button></div></div>
+        <div class="bidang" id="ttBagPrivasi" hidden><label>Siapa yang bisa menonton <em>wajib dipilih</em></label><select class="input" id="ttPrivasi"></select></div>
+        <div class="bidang"><label>Caption <em class="ug-hitung" data-untuk="ttTeks" data-maks="2200"></em></label><textarea class="input" id="ttTeks" rows="5"></textarea></div>
+        <div id="ttBagInteraksi" hidden>
+          <label class="saklar" style="justify-content:flex-start;gap:10px"><input type="checkbox" id="ttKomentar"> Izinkan komentar</label>
+          <label class="saklar" style="justify-content:flex-start;gap:10px"><input type="checkbox" id="ttDuet"> Izinkan Duet</label>
+          <label class="saklar" style="justify-content:flex-start;gap:10px"><input type="checkbox" id="ttStitch"> Izinkan Stitch</label>
+          <label class="saklar" style="justify-content:flex-start;gap:10px"><input type="checkbox" id="ttMerek"> Konten bermerek (kampanye berbayar pihak lain)</label>
+          <label class="saklar" style="justify-content:flex-start;gap:10px"><input type="checkbox" id="ttPromosi"> Mempromosikan bisnis/merekmu sendiri</label>
+          <small style="color:var(--redup)" id="ttCatatanMerek"></small>
+        </div>
+      </div>
+      <div class="ug-panel" data-panel="instagram" hidden>
+        <div class="catatan ug-peringatan" hidden></div>
+        <div class="bidang"><label>Caption <em class="ug-hitung" data-untuk="igTeks" data-maks="2200"></em></label><textarea class="input" id="igTeks" rows="6"></textarea></div>
+        <label class="saklar" style="justify-content:flex-start;gap:10px"><input type="checkbox" id="igFeed" checked> Tampilkan juga di feed profil</label>
+      </div>
+      <div class="grid2" style="gap:10px;margin-top:12px">
+        <div class="bidang"><label>Jadwal <em>kosong = secepatnya</em></label><input class="input" id="ugJadwal" type="datetime-local"></div>
+        <div class="bidang"><label>Bukti izin konten</label><input class="input" id="ugSumberIzin" placeholder="link kampanye atau izin tertulis"></div>
+      </div>
       <label class="saklar" style="justify-content:flex-start;gap:10px"><input type="checkbox" id="ugIzin"> Saya pemilik konten ini atau punya izin dari pemiliknya untuk mengunggahnya.</label>
     </div>
   </div>
-  <div class="wiz-kaki"><span class="ket">Video tidak akan diunggah tanpa menekan tombol ini.</span><button class="tombol kedua" id="ugBatal">Batal</button><button class="tombol utama" id="ugKirim">Unggah sekarang</button></div>
+  <div class="wiz-kaki"><span class="ket" id="ugKetKirim">Video tidak akan diunggah tanpa menekan tombol ini.</span><button class="tombol kedua" id="ugBatal">Batal</button><button class="tombol utama" id="ugKirim">Unggah</button></div>
 </div></div>
 <div class="tirai" id="wizard" hidden><div class="wiz">
   <div class="wiz-kepala"><img src="/aset/ikon.png" alt=""><div><h2>Pemasangan Studio Maliki</h2><small>Klip + Motion · gratis · jalan di laptopmu</small></div>
@@ -1305,69 +1358,139 @@ $('#tblMotion').onclick = async () => {
 $('#salinPrompt').onclick = (e) => { e.preventDefault(); salin(`Kamu penulis naskah video pendek berbahasa Indonesia. Topik: [TOPIK]. Tulis 4–7 adegan; adegan 1 hook; satu kalimat narasi per adegan maks 14 kata; judul layar 2–5 kata; jangan mengarang angka; adegan terakhir ajakan. Balas HANYA JSON: {"judul":"...","adegan":[{"judul":"2-5 kata","teks":"kalimat narasi","kunci":["kata"],"ikon":"🔥"}]}`); };
 
 // hasil
-// ── Unggah ke YouTube (selalu lewat review) ──
+// ── Unggah ke media sosial (selalu lewat review) ──
 const bukaTautan = (url) => buka(url);
-let UG = null;
+const NAMA_PL = {youtube: 'YouTube', tiktok: 'TikTok', instagram: 'Instagram'};
+let UG = null, AKUN = {};
+const statAkun = (a, butuhKlien = true) => (butuhKlien ? `<span class="stat">${a.klien ? '✅' : '⚪'} <b>client</b> ${a.klien ? 'tersimpan' : 'belum'}</span>` : '') +
+  `<span class="stat">${a.terhubung ? '✅' : '⚪'} <b>akun</b> ${a.terhubung ? esc(a.kanal || 'tersambung') : 'belum tersambung'}</span>`;
 async function muatAkun() {
-  try {
-    const {youtube: y} = await api('/api/akun-unggah');
-    $('#statusYT').innerHTML = `<span class="stat">${y.klien ? '✅' : '⚪'} <b>Client OAuth</b> ${y.klien ? 'tersimpan' : 'belum diisi'}</span>` +
-      `<span class="stat">${y.terhubung ? '✅' : '⚪'} <b>Akun</b> ${y.terhubung ? esc(y.kanal || 'tersambung') : 'belum tersambung'}</span>`;
-    $('#tblMasukYT').hidden = !y.klien || y.terhubung; $('#tblPutusYT').hidden = !y.terhubung;
-    return y;
-  } catch { return {}; }
+  try { AKUN = await api('/api/akun-unggah'); } catch { return AKUN; }
+  $('#statusYT').innerHTML = statAkun(AKUN.youtube); $('#statusTT').innerHTML = statAkun(AKUN.tiktok); $('#statusIG').innerHTML = statAkun(AKUN.instagram, false);
+  for (const p of ['youtube', 'tiktok', 'instagram']) {
+    const a = AKUN[p] || {};
+    const m = $(`[data-masuk="${p}"]`); if (m) m.hidden = !a.klien || a.terhubung;
+    const u = $(`[data-putus="${p}"]`); if (u) u.hidden = !a.terhubung;
+  }
+  $('#ttRedirect').textContent = `http://127.0.0.1:${location.port}/oauth/tiktok`;
+  if (typeof PENG === 'object' && PENG) $('#jedaPosting').value = PENG.JEDA_POSTING_MENIT || 30;
+  return AKUN;
 }
 $('#tblSimpanKlienYT').onclick = async () => {
   try { await api('/api/youtube-klien', {client_id: $('#ytClientId').value, client_secret: $('#ytClientSecret').value});
     $('#ytClientSecret').value = ''; toast('Client tersimpan ✓'); muatAkun(); } catch (e) { toast(e.message, true); }
 };
-$('#tblMasukYT').onclick = async () => {
-  try { await api('/api/youtube-masuk', {}); toast('Halaman izin Google terbuka di browser. Setelah selesai, kembali ke sini.');
-    let n = 0; const t = setInterval(async () => { const y = await muatAkun(); if (y.terhubung || ++n > 120) clearInterval(t); }, 2500);
-  } catch (e) { toast(e.message, true); }
+$('#tblSimpanKlienTT').onclick = async () => {
+  try { await api('/api/tiktok-klien', {client_key: $('#ttKey').value, client_secret: $('#ttSecret').value});
+    $('#ttSecret').value = ''; toast('Client tersimpan ✓'); muatAkun(); } catch (e) { toast(e.message, true); }
 };
-$('#tblPutusYT').onclick = async () => { try { await api('/api/youtube-putus', {}); toast('YouTube diputuskan'); muatAkun(); } catch (e) { toast(e.message, true); } };
+$('#tblSimpanIG').onclick = async () => {
+  try { await api('/api/instagram-token', {token: $('#igToken').value}); $('#igToken').value = ''; toast('Instagram tersambung ✓'); muatAkun(); }
+  catch (e) { toast(e.message, true); }
+};
+$('#tblSimpanJeda').onclick = async () => {
+  try { const r = await api('/api/pengaturan', {JEDA_POSTING_MENIT: String(Math.max(0, +$('#jedaPosting').value || 0))}); PENG = r.pengaturan; toast('Jeda tersimpan ✓'); }
+  catch (e) { toast(e.message, true); }
+};
+$$('[data-masuk]').forEach((b) => b.onclick = async () => {
+  const p = b.dataset.masuk;
+  try { await api(`/api/${p}-masuk`, {}); toast(`Halaman izin ${NAMA_PL[p]} terbuka di browser. Setelah selesai, kembali ke sini.`);
+    let n = 0; const t = setInterval(async () => { const a = await muatAkun(); if (a[p]?.terhubung || ++n > 120) clearInterval(t); }, 2500);
+  } catch (e) { toast(e.message, true); }
+});
+$$('[data-putus]').forEach((b) => b.onclick = async () => {
+  if (!confirm(`Putuskan akun ${NAMA_PL[b.dataset.putus]}?`)) return;
+  try { await api(`/api/${b.dataset.putus}-putus`, {}); toast('Akun diputuskan'); muatAkun(); } catch (e) { toast(e.message, true); }
+});
 $$('[data-tautan-luar]').forEach((a) => a.onclick = (e) => { e.preventDefault(); buka(a.dataset.tautanLuar); });
+function hitungUG() { $$('.ug-hitung').forEach((em) => { const el = $('#' + em.dataset.untuk); em.textContent = `${el.value.length}/${em.dataset.maks}`; em.style.color = el.value.length > +em.dataset.maks ? 'var(--merah)' : ''; }); }
+function tampilTabUG() {
+  const pilih = [...UG.platform];
+  $('#ugTab').innerHTML = pilih.map((p) => `<button data-v="${p}" class="${p === UG.tab ? 'aktif' : ''}">${NAMA_PL[p]}</button>`).join('');
+  $('#ugTab').hidden = pilih.length < 2;
+  $$('#ugTab button').forEach((b) => b.onclick = () => { UG.tab = b.dataset.v; tampilTabUG(); });
+  $$('.ug-panel').forEach((x) => x.hidden = x.dataset.panel !== UG.tab || !UG.platform.has(x.dataset.panel));
+  $('#ugKirim').textContent = pilih.length ? `Unggah ke ${pilih.map((p) => NAMA_PL[p]).join(' + ')}` : 'Pilih platform';
+  $('#ugKirim').disabled = !pilih.length;
+}
+async function isiCaptionUG(p) {
+  const c = await api('/api/caption', {nama: KLIP.h.nama, no: UG.no, platform: p, kampanye: $('#ugKampanye').value, judul: KLIP.judul[UG.no]});
+  const pnl = $(`.ug-panel[data-panel="${p}"]`);
+  const w = $('.ug-peringatan', pnl); w.hidden = !c.peringatan.length; w.innerHTML = c.peringatan.map((x) => '⚠ ' + esc(x)).join('<br>');
+  if (p === 'youtube') { $('#ytJudul').value = c.judul; $('#ytDesk').value = c.teks; $('#ytTag').value = c.tag.join(', '); }
+  if (p === 'tiktok') { $('#ttTeks').value = c.teks; $('#ttMerek').checked = c.konten_bermerek; }
+  if (p === 'instagram') $('#igTeks').value = c.teks;
+  if (c.sumber_izin) $('#ugSumberIzin').value = c.sumber_izin;
+  hitungUG();
+}
+async function isiSemuaCaption() { for (const p of UG.platform) { try { await isiCaptionUG(p); } catch (e) { toast(e.message, true); } } }
+async function muatKreatorTT() {
+  $('#ttKreator').textContent = 'Memuat info akun TikTok…';
+  try {
+    const k = await api('/api/tiktok-kreator', {}); UG.kreator = k;
+    $('#ttKreator').innerHTML = `Posting sebagai <b>${esc(k.creator_nickname || k.creator_username || 'akun TikTok')}</b>${k.max_video_post_duration_sec ? ` · maks ${k.max_video_post_duration_sec} dtk` : ''}`;
+    $('#ttPrivasi').innerHTML = '<option value="">— pilih —</option>' + (k.privacy_level_options || []).map((v) => `<option value="${esc(v)}">${esc({PUBLIC_TO_EVERYONE: 'Semua orang', MUTUAL_FOLLOW_FRIENDS: 'Teman (saling mengikuti)', FOLLOWER_OF_CREATOR: 'Pengikut', SELF_ONLY: 'Hanya aku'}[v] || v)}</option>`).join('');
+    $('#ttKomentar').disabled = !!k.comment_disabled; $('#ttDuet').disabled = !!k.duet_disabled; $('#ttStitch').disabled = !!k.stitch_disabled;
+  } catch (e) { $('#ttKreator').textContent = 'Gagal memuat info akun: ' + e.message; }
+}
+function catatanMerekTT() {
+  const m = $('#ttMerek').checked, s = $('#ttPromosi').checked;
+  $('#ttCatatanMerek').textContent = m ? 'Video akan diberi label "Kemitraan berbayar". Dengan memposting, kamu menyetujui Kebijakan Konten Bermerek dan Ketentuan Musik TikTok.' :
+    s ? 'Video akan diberi label "Konten promosi". Dengan memposting, kamu menyetujui Ketentuan Musik TikTok.' : 'Dengan memposting, kamu menyetujui Ketentuan Musik TikTok.';
+  if (m && $('#ttPrivasi').value === 'SELF_ONLY') { $('#ttPrivasi').value = ''; toast('Konten bermerek tidak bisa diatur "Hanya aku".', true); }
+}
+['#ttMerek', '#ttPromosi', '#ttPrivasi'].forEach((x) => $(x).addEventListener('change', catatanMerekTT));
+$$('#ttMode button').forEach((b) => b.onclick = () => {
+  $$('#ttMode button').forEach((x) => x.classList.toggle('aktif', x === b)); UG.ttMode = b.dataset.v;
+  $('#ttBagPrivasi').hidden = $('#ttBagInteraksi').hidden = b.dataset.v !== 'langsung';
+  if (b.dataset.v === 'langsung' && !UG.kreator) muatKreatorTT();
+  catatanMerekTT();
+});
+$$('#ytPrivasi button').forEach((b) => b.onclick = () => { UG.ytPrivasi = b.dataset.v; $$('#ytPrivasi button').forEach((x) => x.classList.toggle('aktif', x === b)); });
+['#ytJudul', '#ytDesk', '#ttTeks', '#igTeks'].forEach((x) => $(x).addEventListener('input', hitungUG));
 async function bukaUnggah(k) {
   if (!k || !KLIP.h) return;
-  const y = await muatAkun();
-  if (!y.terhubung) { toast('Sambungkan akun YouTube dulu di Pengaturan AI → Akun unggah.', true); ke('pengaturan'); $('#kartuAkun').scrollIntoView({behavior: 'smooth'}); return; }
-  UG = {no: k.no, privasi: 'private'};
-  $('#ugKet').textContent = `klip ${k.no} · ${Math.round(k.selesai - k.mulai)} detik · akun ${y.kanal || 'YouTube'}`;
+  await muatAkun();
+  const ada = ['youtube', 'tiktok', 'instagram'].filter((p) => AKUN[p]?.terhubung);
+  if (!ada.length) { toast('Sambungkan minimal satu akun dulu di Pengaturan AI → Akun unggah.', true); ke('pengaturan'); $('#kartuAkun').scrollIntoView({behavior: 'smooth'}); return; }
+  UG = {no: k.no, klip: k, platform: new Set([ada[0]]), tab: ada[0], ytPrivasi: 'private', ttMode: 'draf', kreator: null};
+  $('#ugKet').textContent = `klip ${k.no} · ${Math.round(k.selesai - k.mulai)} detik`;
   $('#ugVideo').src = `/berkas/klip/${KLIP.h.nama}/${k.file}`;
-  $('#ugJudul').value = (KLIP.judul[k.no] ?? k.judul ?? '').slice(0, 100);
-  $('#ugSumberIzin').value = ''; $('#ugIzin').checked = false; $('#ugAnak').checked = false;
-  await muatKampanye(); await isiCaptionYT();
-  $$('#ugPrivasi button').forEach((b) => b.classList.toggle('aktif', b.dataset.v === 'private'));
-  $('#ugHitung').textContent = `${$('#ugJudul').value.length}/100`;
+  $('#ugPlatform').innerHTML = ['youtube', 'tiktok', 'instagram'].map((p) => `<button data-v="${p}" ${AKUN[p]?.terhubung ? '' : 'disabled title="belum tersambung"'} class="${UG.platform.has(p) ? 'aktif' : ''}">${NAMA_PL[p]}${AKUN[p]?.terhubung ? '' : ' ·  belum'}</button>`).join('');
+  $$('#ugPlatform button').forEach((b) => b.onclick = async () => {
+    const p = b.dataset.v; if (UG.platform.has(p)) UG.platform.delete(p); else { UG.platform.add(p); UG.tab = p; await isiCaptionUG(p).catch((e) => toast(e.message, true)); }
+    b.classList.toggle('aktif', UG.platform.has(p)); if (!UG.platform.has(UG.tab)) UG.tab = [...UG.platform][0]; tampilTabUG();
+  });
+  $('#ugSumberIzin').value = ''; $('#ugIzin').checked = false; $('#ytAnak').checked = false; $('#ugJadwal').value = '';
+  ['#ttKomentar', '#ttDuet', '#ttStitch', '#ttMerek', '#ttPromosi'].forEach((x) => { $(x).checked = false; $(x).disabled = false; });
+  $$('#ytPrivasi button').forEach((b) => b.classList.toggle('aktif', b.dataset.v === 'private'));
+  $$('#ttMode button').forEach((b) => b.classList.toggle('aktif', b.dataset.v === 'draf')); $('#ttBagPrivasi').hidden = $('#ttBagInteraksi').hidden = true;
+  $('#ttKreator').textContent = 'Mode draf: video masuk kotak masuk TikTok, kamu menyelesaikan posting di aplikasi.';
+  await muatKampanye(); await isiSemuaCaption(); tampilTabUG(); catatanMerekTT();
   $('#dlgUnggah').hidden = false;
 }
-async function isiCaptionYT() {
-  if (!UG) return;
-  try {
-    const c = await api('/api/caption', {nama: KLIP.h.nama, no: UG.no, platform: 'youtube', kampanye: $('#ugKampanye').value, judul: KLIP.judul[UG.no]});
-    $('#ugJudul').value = c.judul; $('#ugDesk').value = c.teks; $('#ugTag').value = c.tag.join(', ');
-    if (c.sumber_izin) $('#ugSumberIzin').value = c.sumber_izin;
-    $('#ugPeringatan').hidden = !c.peringatan.length; $('#ugPeringatan').innerHTML = c.peringatan.map((x) => '⚠ ' + esc(x)).join('<br>');
-    $('#ugHitung').textContent = `${$('#ugJudul').value.length}/100`;
-  } catch (e) { toast(e.message, true); }
-}
-$('#ugKampanye').onchange = isiCaptionYT;
+$('#ugKampanye').onchange = isiSemuaCaption;
 const tutupUnggah = () => { $('#dlgUnggah').hidden = true; $('#ugVideo').pause(); UG = null; };
 $('#ugBatal').onclick = tutupUnggah;
-$('#ugJudul').oninput = () => { $('#ugHitung').textContent = `${$('#ugJudul').value.length}/100`; };
-$$('#ugPrivasi button').forEach((b) => b.onclick = () => { UG.privasi = b.dataset.v; $$('#ugPrivasi button').forEach((x) => x.classList.toggle('aktif', x === b)); });
 $('#ugKirim').onclick = async () => {
-  if (!UG) return;
+  if (!UG || !UG.platform.size) return;
   if (!$('#ugIzin').checked) return toast('Centang dulu pernyataan izin konten.', true);
-  if (UG.privasi === 'public' && !confirm('Unggah sebagai PUBLIK? Video langsung bisa dilihat semua orang.')) return;
-  try {
-    await api('/api/unggah-klip', {platform: 'youtube', nama: KLIP.h.nama, no: UG.no, judul: $('#ugJudul').value, deskripsi: $('#ugDesk').value,
-      tag: $('#ugTag').value.split(',').map((t) => t.trim()).filter(Boolean), privasi: UG.privasi, untuk_anak: $('#ugAnak').checked,
-      sumber_izin: $('#ugSumberIzin').value, kampanye: $('#ugKampanye').value, izin: true});
-    muatAntrean();
-    tutupUnggah(); toast('Masuk antrean unggah. Render tetap bisa jalan. Pantau di menu Antrean.');
-  } catch (e) { toast(e.message, true); }
+  const jadwal = $('#ugJadwal').value ? Math.floor(new Date($('#ugJadwal').value).getTime() / 1000) : 0;
+  if (UG.platform.has('tiktok') && UG.ttMode === 'langsung' && !$('#ttPrivasi').value) { UG.tab = 'tiktok'; tampilTabUG(); return toast('Pilih siapa yang bisa menonton video TikTok-nya.', true); }
+  const publik = (UG.platform.has('youtube') && UG.ytPrivasi === 'public') || (UG.platform.has('tiktok') && UG.ttMode === 'langsung' && $('#ttPrivasi').value === 'PUBLIC_TO_EVERYONE') || UG.platform.has('instagram');
+  if (publik && !confirm('Video akan tayang PUBLIK di platform yang dipilih. Lanjutkan?')) return;
+  const umum = {nama: KLIP.h.nama, no: UG.no, kampanye: $('#ugKampanye').value, sumber_izin: $('#ugSumberIzin').value, jadwal, izin: true};
+  const isi = {
+    youtube: {judul: $('#ytJudul').value, deskripsi: $('#ytDesk').value, tag: $('#ytTag').value.split(',').map((t) => t.trim()).filter(Boolean), privasi: UG.ytPrivasi, untuk_anak: $('#ytAnak').checked},
+    tiktok: {teks: $('#ttTeks').value, mode: UG.ttMode, privasi: $('#ttPrivasi').value, tanpa_komentar: !$('#ttKomentar').checked, tanpa_duet: !$('#ttDuet').checked,
+      tanpa_stitch: !$('#ttStitch').checked, konten_bermerek: $('#ttMerek').checked, promosi_sendiri: $('#ttPromosi').checked},
+    instagram: {teks: $('#igTeks').value, ke_feed: $('#igFeed').checked},
+  };
+  const gagal = [];
+  for (const p of UG.platform) { try { await api('/api/unggah-klip', {...umum, ...isi[p], platform: p}); } catch (e) { gagal.push(`${NAMA_PL[p]}: ${e.message}`); } }
+  muatAntrean();
+  if (gagal.length) return toast(gagal.join(' · '), true);
+  tutupUnggah(); toast(jadwal ? 'Terjadwal ✓ Pantau di menu Antrean.' : 'Masuk antrean unggah. Pantau di menu Antrean.');
 };
 muatAkun();
 // ── Kampanye clipper ──
@@ -1552,8 +1675,8 @@ function gambarKlip() {
       <div class="trans" id="tr-${k.no}">${esc(k.kutipan)}</div>
       ${k.file ? `<div class="k-hasil"><video src="${base + k.file}?v=${Date.now()}" controls preload="metadata" playsinline></video><div><div class="eyebrow" style="margin-bottom:8px">sudah dirender</div>
         <a class="tombol utama kecil" href="${base + k.file}" download data-jenis="klip" data-nama="${h.nama}" data-file="${k.file}">Unduh MP4</a>
-        <button class="tombol kedua kecil" data-unggah="${k.no}" style="margin-top:8px">Unggah ke YouTube…</button>
-        ${(k.unggahan || []).map((u) => `<div class="catatan" style="margin:8px 0 0">✓ ${esc(u.platform)} · ${esc(u.privasi)} · <a href="#" data-tautan="${esc(u.url)}">${esc(u.url)}</a></div>`).join('')}</div></div>` : ''}
+        <button class="tombol kedua kecil" data-unggah="${k.no}" style="margin-top:8px">Unggah…</button>
+        ${(k.unggahan || []).map((u) => `<div class="catatan" style="margin:8px 0 0">✓ ${esc(u.platform)} · ${esc(u.privasi)} · ${u.url ? `<a href="#" data-tautan="${esc(u.url)}">${esc(u.url)}</a>` : esc(u.status === 'SEND_TO_USER_INBOX' ? 'menunggu diselesaikan di aplikasi TikTok' : u.id || '')}</div>`).join('')}</div></div>` : ''}
     </div>`).join('') : '<div class="kartu kosong"><b>Tidak ada klip yang cocok</b>Ubah kata kunci atau filter skor.</div>';
   $$('[data-c]').forEach((c) => c.onclick = (e) => { e.stopPropagation(); const n = +c.dataset.c; c.checked ? KLIP.pilih.add(n) : KLIP.pilih.delete(n); gambarKlip(); });
   $$('.ikh').forEach((it) => it.onclick = () => $('#kk-' + it.dataset.ke)?.scrollIntoView({behavior: 'smooth', block: 'center'}));
@@ -1835,7 +1958,7 @@ async function muatRiwayat() {
 <script>
 // ── Audit 14 Nov: status proses global, tema, bilah render Klip, jendela diam ──
 (() => {
-  const JENIS = {klip: ['Menganalisis video', 'klip'], render: ['Merender klip', 'klip'], unggah: ['Mengunggah klip', 'klip'], motion: ['Membuat video motion', 'motion'],
+  const JENIS = {klip: ['Menganalisis video', 'klip'], render: ['Merender klip', 'klip'], motion: ['Membuat video motion', 'motion'],
     pasang: ['Memasang komponen', 'pengaturan'], suara: ['Menyiapkan suara', 'pengaturan']};
   let mulai = 0, idLalu = null;
   const pil = document.getElementById('pilKerja');

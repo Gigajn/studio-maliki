@@ -31,6 +31,8 @@ sys.path.insert(0, str(AKAR))
 import unggah as UNGGAH  # noqa: E402  (pustaka standar saja)
 from antrean import Antrean, Kerja  # noqa: E402
 import caption as CAPTION  # noqa: E402
+import unggah_instagram as IG  # noqa: E402
+import unggah_tiktok as TT  # noqa: E402
 
 ALAT = AKAR.parent
 KLIP = ALAT / "klip"
@@ -167,7 +169,8 @@ PAKET_CLI = {"codex": "@openai/codex", "opencode": "opencode-ai", "claude": "@an
 PERINTAH_LOGIN = {"claude": "claude auth login", "codex": "codex login", "opencode": "opencode auth login"}
 DOMAIN_BOLEH = ("aistudio.google.com", "ollama.com", "nodejs.org", "platform.openai.com",
                 "openrouter.ai", "console.groq.com", "chatgpt.com", "claude.ai", "opencode.ai", "docs.astral.sh",
-                "youtube.com", "www.youtube.com", "studio.youtube.com", "console.cloud.google.com")
+                "youtube.com", "www.youtube.com", "studio.youtube.com", "console.cloud.google.com",
+                "developers.tiktok.com", "www.tiktok.com", "developers.facebook.com", "www.instagram.com")
 
 
 def cari_cli(nama: str) -> str | None:
@@ -557,30 +560,45 @@ OAUTH_SESI: dict = {}
 RIWAYAT_UNGGAH = DATA / "unggah" / "riwayat.jsonl"
 
 
-def youtube_masuk() -> dict:
-    url, sesi = UNGGAH.mulai_izin(DATA, f"http://127.0.0.1:{PORT}/oauth/youtube")
-    OAUTH_SESI.clear()
+MODUL_PLATFORM = {"youtube": UNGGAH, "tiktok": TT, "instagram": IG}
+NAMA_PLATFORM = {"youtube": "YouTube", "tiktok": "TikTok", "instagram": "Instagram"}
+
+
+def status_akun() -> dict:
+    return {p: m.status(DATA) for p, m in MODUL_PLATFORM.items()}
+
+
+def oauth_masuk(platform: str) -> dict:
+    """Buka halaman izin resmi platform di browser bawaan (Instagram memakai token tempel, bukan OAuth lokal)."""
+    if platform not in ("youtube", "tiktok"):
+        raise ValueError("Platform ini tidak memakai login OAuth lokal.")
+    url, sesi = MODUL_PLATFORM[platform].mulai_izin(DATA, f"http://127.0.0.1:{PORT}/oauth/{platform}")
+    sesi["platform"] = platform
+    for k in [k for k, v in OAUTH_SESI.items() if v.get("platform") == platform]:
+        OAUTH_SESI.pop(k)
     OAUTH_SESI[sesi["state"]] = sesi
-    webbrowser.open(url)  # halaman izin resmi Google di browser bawaan
+    webbrowser.open(url)
     return {"ok": True, "url": url}
 
 
-def oauth_youtube_kembali(q: dict) -> str:
+def oauth_kembali(platform: str, q: dict) -> str:
     def halaman(judul: str, isi: str) -> str:
         return (f"<!doctype html><meta charset=utf-8><title>Studio Maliki</title><body style='font-family:system-ui;"
                 f"background:#07090F;color:#e2e8f0;display:grid;place-items:center;height:100vh;margin:0'>"
                 f"<div style='max-width:420px;text-align:center'><h2>{html.escape(judul)}</h2><p>{html.escape(isi)}</p></div>")
+    nama = NAMA_PLATFORM.get(platform, platform)
     state = (q.get("state") or [""])[0]
-    sesi = OAUTH_SESI.pop(state, None)
-    if not sesi or time.time() - sesi["waktu"] > 600:
-        return halaman("Tautan izin tidak berlaku", "Ulangi dari Studio: Pengaturan → Akun unggah → Sambungkan YouTube.")
+    sesi = OAUTH_SESI.get(state)
+    if not sesi or sesi.get("platform") != platform or time.time() - sesi["waktu"] > 600:
+        return halaman("Tautan izin tidak berlaku", f"Ulangi dari Studio: Pengaturan → Akun unggah → Sambungkan {nama}.")
+    OAUTH_SESI.pop(state, None)
     if q.get("error"):
-        return halaman("Izin dibatalkan", f"Google: {(q.get('error') or [''])[0]}")
+        return halaman("Izin dibatalkan", f"{nama}: {(q.get('error_description') or q.get('error') or [''])[0]}")
     try:
-        UNGGAH.tukar_kode(DATA, sesi, (q.get("code") or [""])[0])
+        MODUL_PLATFORM[platform].tukar_kode(DATA, sesi, (q.get("code") or [""])[0])
     except Exception as e:  # noqa: BLE001
-        return halaman("Gagal menyambungkan YouTube", str(e))
-    return halaman("YouTube tersambung ✓", "Tutup tab ini lalu kembali ke Studio Maliki.")
+        return halaman(f"Gagal menyambungkan {nama}", str(e))
+    return halaman(f"{nama} tersambung ✓", "Tutup tab ini lalu kembali ke Studio Maliki.")
 
 
 def _klip_proyek(nama: str, no: int) -> tuple[Path, dict, dict]:
@@ -603,39 +621,66 @@ def susun_caption(d: dict) -> dict:
     return CAPTION.susun(klip, info, str(d.get("platform", "youtube")), kamp)
 
 
+def _jadwal(nilai) -> float:
+    try:
+        t = float(nilai or 0)
+    except (TypeError, ValueError):
+        raise ValueError("Jadwal tidak valid.") from None
+    if t and t < time.time() - 60:
+        raise ValueError("Jadwal sudah lewat. Pilih waktu yang akan datang.")
+    if t > time.time() + 90 * 86400:
+        raise ValueError("Jadwal maksimal 90 hari ke depan.")
+    return t
+
+
 def mulai_unggah(d: dict) -> dict:
-    """Unggah satu klip yang SUDAH direview pengguna. Tanpa centang izin, permintaan ditolak."""
-    if d.get("platform", "youtube") != "youtube":
-        raise ValueError("Saat ini baru YouTube yang didukung.")
+    """Unggah satu klip yang SUDAH direview pengguna ke satu platform. Tanpa centang izin, permintaan ditolak."""
+    platform = str(d.get("platform", "youtube"))
+    if platform not in MODUL_PLATFORM:
+        raise ValueError("Platform belum didukung.")
     if d.get("izin") is not True:
         raise ValueError("Centang pernyataan bahwa kamu berhak mengunggah konten ini.")
-    if not UNGGAH.status(DATA)["terhubung"]:
-        raise ValueError("Sambungkan akun YouTube dulu di Pengaturan → Akun unggah.")
-    nama = re.sub(r"[^\w-]", "", str(d.get("nama", "")))
-    folder = DATA / "klip" / nama
-    no = int(d.get("no", 0))
-    daftar = json.loads((folder / "klip.json").read_text(encoding="utf-8")) if (folder / "klip.json").exists() else []
-    klip = next((x for x in daftar if x.get("no") == no), None)
-    if not klip or not klip.get("file") or not (folder / Path(klip["file"]).name).is_file():
+    if not MODUL_PLATFORM[platform].status(DATA)["terhubung"]:
+        raise ValueError(f"Sambungkan akun {NAMA_PLATFORM[platform]} dulu di Pengaturan → Akun unggah.")
+    folder, klip, _ = _klip_proyek(d.get("nama"), d.get("no", 0))
+    nama, no = folder.name, int(d.get("no", 0))
+    if not klip.get("file") or not (folder / Path(klip["file"]).name).is_file():
         raise ValueError("Klip belum dirender. Render dulu, lalu unggah.")
-    meta = UNGGAH.rapikan_meta(d)
-    meta["sumber_izin"] = str(d.get("sumber_izin", ""))[:300]
     kamp = CAPTION.cari_kampanye(DATA, str(d.get("kampanye") or ""))
+    batas = CAPTION.PLATFORM[platform]
+    if platform == "youtube":
+        meta = UNGGAH.rapikan_meta(d)
+        judul_label = meta["judul"]
+    else:
+        teks = str(d.get("teks", "")).replace("\r", "")
+        if len(teks) > batas["teks"]:
+            raise ValueError(f"Caption {NAMA_PLATFORM[platform]} maksimal {batas['teks']} karakter.")
+        meta = {"teks": teks, "konten_bermerek": bool(d.get("konten_bermerek")), "promosi_sendiri": bool(d.get("promosi_sendiri"))}
+        if platform == "tiktok":
+            meta.update(mode="langsung" if d.get("mode") == "langsung" else "draf", privasi=str(d.get("privasi") or ""),
+                        tanpa_komentar=bool(d.get("tanpa_komentar")), tanpa_duet=bool(d.get("tanpa_duet")),
+                        tanpa_stitch=bool(d.get("tanpa_stitch")), durasi=float(klip.get("selesai", 0)) - float(klip.get("mulai", 0)))
+            if meta["mode"] == "langsung" and not meta["privasi"]:
+                raise ValueError("Pilih privasi TikTok dulu (tidak ada pilihan bawaan sesuai aturan TikTok).")
+        else:
+            meta["ke_feed"] = d.get("ke_feed", True) is not False
+        judul_label = (teks.splitlines() or [""])[0]
+    if d.get("cover_ms") not in (None, ""):
+        meta["cover_ms"] = max(int(float(d["cover_ms"])), 0)
+    meta["sumber_izin"] = str(d.get("sumber_izin", "") or (kamp or {}).get("sumber_izin", ""))[:300]
     meta["kampanye"] = kamp["id"] if kamp else ""
-    if kamp and not meta["sumber_izin"]:
-        meta["sumber_izin"] = kamp.get("sumber_izin", "")
+    jadwal = _jadwal(d.get("jadwal"))
     berkas = folder / Path(klip["file"]).name
-    f_meta = folder / f"unggah-{no:02d}.json"
-    f_hasil = folder / f"unggah-{no:02d}-hasil.json"
-    f_hasil.unlink(missing_ok=True)
+    kode = f"{no:02d}-{platform}-{int(time.time() * 1000) % 10**8}"
+    f_meta, f_hasil = folder / f"unggah-{kode}.json", folder / f"unggah-{kode}-hasil.json"
     f_meta.write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
-    cmd = [*jalankan_skrip(AKAR / "unggah.py"), "--data", str(DATA), "--berkas", str(berkas),
+    cmd = [*jalankan_skrip(AKAR / "unggah.py"), "--platform", platform, "--data", str(DATA), "--berkas", str(berkas),
            "--meta", str(f_meta), "--hasil", str(f_hasil)]
-
     t = ANTREAN.tambah("unggah", "unggah", [(cmd, AKAR)], folder,
                        ("unggah_selesai", {"nama": nama, "no": no, "f_hasil": str(f_hasil), "sumber_izin": meta["sumber_izin"],
                                           "kampanye": meta["kampanye"]}),
-                       label=f"YouTube: {meta['judul']}"[:120], platform="youtube", info={"proyek": nama, "no": no})
+                       label=f"{NAMA_PLATFORM[platform]}: {judul_label}"[:120], platform=platform, jadwal=jadwal,
+                       info={"proyek": nama, "no": no, "platform": platform})
     return {"proyek": nama, **t}
 
 
@@ -752,8 +797,8 @@ class H(BaseHTTPRequestHandler):
         jalur = unquote(u.path)
         if not self._host_aman():
             return self._json({"galat": "host tidak diizinkan"}, 403)
-        if jalur == "/oauth/youtube":  # kembali dari halaman izin Google (lintas situs, dijaga oleh state + PKCE)
-            return self._html(oauth_youtube_kembali(parse_qs(u.query)))
+        if jalur in ("/oauth/youtube", "/oauth/tiktok"):  # kembali dari halaman izin (lintas situs, dijaga state + PKCE)
+            return self._html(oauth_kembali(jalur.rsplit("/", 1)[1], parse_qs(u.query)))
         if jalur.startswith(("/api/", "/berkas/")) and not self._bukan_lintas_situs():
             return self._json({"galat": "asal tidak diizinkan"}, 403)
         try:
@@ -785,7 +830,7 @@ class H(BaseHTTPRequestHandler):
             if jalur == "/api/antrean":
                 return self._json(ANTREAN.daftar())
             if jalur == "/api/akun-unggah":
-                return self._json({"youtube": UNGGAH.status(DATA)})
+                return self._json(status_akun())
             if m := re.match(r"^/api/jejak/([\w-]+)/(\d+)$", jalur):
                 return self._json(jejak_klip(m.group(1), int(m.group(2))))
             if m := re.match(r"^/api/proyek/(klip|motion)/([\w-]+)$", jalur):
@@ -873,12 +918,20 @@ class H(BaseHTTPRequestHandler):
                 if d.get("json"):
                     cid, rahasia = UNGGAH.klien_dari_json(d["json"])
                 UNGGAH.simpan_klien(DATA, cid, rahasia)
-                return self._json({"youtube": UNGGAH.status(DATA)})
-            if jalur == "/api/youtube-masuk":
-                return self._json(youtube_masuk())
-            if jalur == "/api/youtube-putus":
-                UNGGAH.hapus_token(DATA)
-                return self._json({"youtube": UNGGAH.status(DATA)})
+                return self._json(status_akun())
+            if jalur == "/api/tiktok-kreator":
+                return self._json(TT.info_kreator(DATA))
+            if jalur == "/api/tiktok-klien":
+                TT.simpan_klien(DATA, str(d.get("client_key", "")), str(d.get("client_secret", "")))
+                return self._json(status_akun())
+            if jalur == "/api/instagram-token":
+                IG.simpan_token(DATA, str(d.get("token", "")))
+                return self._json(status_akun())
+            if m := re.match(r"^/api/(youtube|tiktok)-masuk$", jalur):
+                return self._json(oauth_masuk(m.group(1)))
+            if m := re.match(r"^/api/(youtube|tiktok|instagram)-putus$", jalur):
+                MODUL_PLATFORM[m.group(1)].hapus_token(DATA)
+                return self._json(status_akun())
             if jalur == "/api/kampanye-simpan":
                 return self._json({"kampanye": CAPTION.simpan_kampanye(DATA, d)})
             if jalur == "/api/kampanye-hapus":
